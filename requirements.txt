@@ -1,0 +1,7 @@
+streamlit
+pymupdf
+beautifulsoup4
+scikit-learn
+requests
+serpapi
+python-dotenv
