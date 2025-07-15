@@ -1,5 +1,5 @@
 import os
-from serpapi.google_search_results import GoogleSearch
+from serpapi.google_search_results import GoogleSearch  # ✅ NEW
 from dotenv import load_dotenv
 
 load_dotenv()
