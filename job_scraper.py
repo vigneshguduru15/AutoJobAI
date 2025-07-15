@@ -1,10 +1,8 @@
-import os
 import requests
+import streamlit as st
 
 def get_jobs(role="python developer", location="India", num_results=10):
-    api_key = os.getenv("SERPAPI_API_KEY")
-    if not api_key:
-        raise ValueError("SERPAPI_API_KEY not found in environment")
+    api_key = st.secrets["SERPAPI_API_KEY"]
 
     params = {
         "engine": "google_jobs",
@@ -29,4 +27,3 @@ def get_jobs(role="python developer", location="India", num_results=10):
         })
 
     return jobs
-
