@@ -1,25 +1,32 @@
 import os
-from serpapi import GoogleSearch 
-from dotenv import load_dotenv
+import requests
 
-load_dotenv()
+def get_jobs(role="python developer", location="India", num_results=10):
+    api_key = os.getenv("SERPAPI_API_KEY")
+    if not api_key:
+        raise ValueError("SERPAPI_API_KEY not found in environment")
 
-def get_jobs(role="python developer"):
     params = {
         "engine": "google_jobs",
         "q": role,
-        "hl": "en",
-        "api_key": os.getenv("SERPAPI_KEY")
+        "location": location,
+        "api_key": api_key
     }
 
-    search = GoogleSearch(params)
-    results = search.get_dict()
+    response = requests.get("https://serpapi.com/search", params=params)
+    data = response.json()
 
     jobs = []
-    for job in results.get("jobs_results", []):
+    results = data.get("jobs_results", [])[:num_results]
+
+    for result in results:
         jobs.append({
-            "title": job.get("title", "No Title"),
-            "link": job.get("apply_options", [{}])[0].get("link", "#")
+            "title": result.get("title", "No Title"),
+            "company": result.get("company_name", "Unknown"),
+            "location": result.get("location", "Unknown"),
+            "description": result.get("description", ""),
+            "link": result.get("via", "No link")
         })
 
     return jobs
+
