@@ -1,7 +1,7 @@
 streamlit
-pymupdf
-beautifulsoup4
+python-docx
+PyPDF2
 scikit-learn
-requests
+beautifulsoup4
 serpapi
 python-dotenv
