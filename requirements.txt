@@ -3,6 +3,6 @@ python-docx
 PyPDF2
 scikit-learn
 beautifulsoup4
-serpapi
+serpapi==0.5.1
 python-dotenv
 PyMuPDF
