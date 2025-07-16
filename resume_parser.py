@@ -1,19 +1,25 @@
 import fitz  # PyMuPDF
+import io
+import re
 
-def extract_text_from_pdf(pdf_path):
-    doc = fitz.open(pdf_path)
+def extract_text_from_pdf(pdf_file):
+    # Read from uploaded file stream
+    doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
     text = ""
     for page in doc:
         text += page.get_text()
     return text
 
-def extract_skills(resume_text):
-    skill_keywords = [
-        "python", "java", "c++", "html", "css", "javascript", "react", "node",
-        "machine learning", "deep learning", "nlp", "flask", "django", "sql",
-        "mongodb", "git", "linux", "aws", "data science", "pandas", "numpy"
+def extract_skills(text):
+    # Simple keyword-based extraction
+    keywords = [
+        "python", "machine learning", "deep learning", "nlp", "sql", "aws",
+        "azure", "pandas", "numpy", "data analysis", "tensorflow", "pytorch",
+        "django", "flask", "react", "node", "java", "c++", "git", "docker",
+        "kubernetes", "linux", "rest", "api", "html", "css", "javascript"
     ]
-
-    resume_text = resume_text.lower()
-    skills = [skill for skill in skill_keywords if skill in resume_text]
-    return skills
+    found = set()
+    for word in keywords:
+        if re.search(rf"\b{re.escape(word)}\b", text, re.IGNORECASE):
+            found.add(word)
+    return list(found)
