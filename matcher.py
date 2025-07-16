@@ -1,7 +1,7 @@
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-def rank_jobs(resume_text, jobs):
+def match_jobs(resume_text, jobs):
     if not jobs:
         return []
 
@@ -20,3 +20,4 @@ def rank_jobs(resume_text, jobs):
         })
 
     return sorted(matched_jobs, key=lambda x: x["score"], reverse=True)
+
