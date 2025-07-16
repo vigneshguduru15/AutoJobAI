@@ -13,14 +13,18 @@ def match_jobs(resume_text, jobs):
 
     for i, score in enumerate(similarity):
         job = jobs[i]
-        
-        # Handle missing or malformed job link
+
+        # Step 1: Try apply_options
         link = None
         if "apply_options" in job and isinstance(job["apply_options"], list):
             for option in job["apply_options"]:
                 if "link" in option and option["link"].startswith("http"):
                     link = option["link"]
                     break
+
+        # Step 2: Fallback to share_link
+        if not link and job.get("share_link", "").startswith("http"):
+            link = job["share_link"]
 
         if not link:
             print("⚠️ Invalid job link found. Skipping this job.")
@@ -32,8 +36,4 @@ def match_jobs(resume_text, jobs):
             "score": round(float(score), 2)
         })
 
-    # Sort jobs by descending match score
     return sorted(matched_jobs, key=lambda x: x["score"], reverse=True)
-
-
-
