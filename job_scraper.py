@@ -3,7 +3,7 @@ import requests
 import streamlit as st
 
 def get_jobs(role="python developer", location="India", num_results=10):
-    api_key = st.secrets["SERPAPI_API_KEY"]  # uses Streamlit secrets
+    api_key = st.secrets["SERPAPI_API_KEY"]
     search_url = "https://serpapi.com/search.json"
 
     params = {
@@ -22,7 +22,6 @@ def get_jobs(role="python developer", location="India", num_results=10):
     for job in job_results:
         link = None
 
-        # Attempt to get apply link
         if "apply_options" in job and job["apply_options"]:
             for option in job["apply_options"]:
                 if "link" in option:
