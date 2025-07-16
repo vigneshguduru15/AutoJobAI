@@ -5,20 +5,35 @@ def match_jobs(resume_text, jobs):
     if not jobs:
         return []
 
-    descriptions = [resume_text] + [job["description"] for job in jobs]
+    descriptions = [resume_text] + [job.get("description", "") for job in jobs]
     vectorizer = TfidfVectorizer().fit_transform(descriptions)
     similarity = cosine_similarity(vectorizer[0:1], vectorizer[1:]).flatten()
 
     matched_jobs = []
+
     for i, score in enumerate(similarity):
         job = jobs[i]
-        link = job.get("apply_options", [{}])[0].get("link", "⚠️ No link available")
+        
+        # Handle missing or malformed job link
+        link = None
+        if "apply_options" in job and isinstance(job["apply_options"], list):
+            for option in job["apply_options"]:
+                if "link" in option and option["link"].startswith("http"):
+                    link = option["link"]
+                    break
+
+        if not link:
+            print("⚠️ Invalid job link found. Skipping this job.")
+            continue
+
         matched_jobs.append({
             "title": job.get("title", "Untitled"),
             "link": link,
             "score": round(float(score), 2)
         })
 
+    # Sort jobs by descending match score
     return sorted(matched_jobs, key=lambda x: x["score"], reverse=True)
+
 
 
