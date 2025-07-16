@@ -1,47 +1,33 @@
 import streamlit as st
-from resume_parser import extract_text_from_pdf, extract_skills
-from matcher import match_jobs
+from resume_parser import extract_text_from_pdf
+from matcher import rank_jobs
 from job_scraper import get_jobs
 
-st.set_page_config(page_title="AutoJobAI - Job Finder", layout="centered")
+st.set_page_config(page_title="AutoJobAI", layout="centered")
 
-st.title("🤖 AutoJobAI - Smart Job Finder")
-st.write("Upload your resume and find the best matching jobs!")
+st.title("🤖 AutoJobAI – Job Matcher")
+st.write("Upload your resume and enter the job role to get matched with job listings.")
 
-# File upload
-uploaded_file = st.file_uploader("📄 Upload your resume (PDF format only)", type=["pdf"])
+uploaded_file = st.file_uploader("📄 Upload your PDF Resume", type=["pdf"])
 
 if uploaded_file is None:
     st.warning("⚠️ Please upload a valid PDF resume to continue.")
     st.stop()
 
-# Extract text and skills
-resume_text = extract_text_from_pdf(uploaded_file)
-skills = extract_skills(resume_text)
-
-st.success("✅ Resume parsed successfully!")
-st.markdown("### 🧠 Extracted Skills:")
-st.write(", ".join(skills))
-
-# Job role input
-job_role = st.text_input("🎯 Enter the job role you're looking for", value="python developer")
+job_role = st.text_input("💼 Enter the job role you're looking for", value="Python Developer")
 
 if job_role:
-    try:
-        jobs = get_jobs(role=job_role)
+    resume_text = extract_text_from_pdf(uploaded_file)
+    jobs = get_jobs(role=job_role)
 
-        if not jobs:
-            st.warning("⚠️ Couldn’t find job listings. Try a different role or check your connection.")
-        else:
-            st.markdown("## 🎯 Top Matching Jobs:")
-            matched_jobs = match_jobs(resume_text, jobs)
+    if not jobs:
+        st.warning("⚠️ Couldn’t find job listings. Try a different role or check your connection.")
+    else:
+        matched_jobs = rank_jobs(resume_text, jobs)
 
-            for job in matched_jobs:
-                if not job["link"].startswith("http"):
-                    st.warning("⚠️ Invalid job link found. Skipping this job.")
-                    continue
-
+        st.subheader("🎯 Top Matching Jobs:")
+        for job in matched_jobs:
+            if "link" in job and job["link"].startswith("http"):
                 st.markdown(f"**{job['title']}** — [Apply Here]({job['link']}) (Match Score: {job['score']})")
-
-    except Exception as e:
-        st.error(f"❌ Something went wrong: {e}")
+            else:
+                st.warning("⚠️ Invalid job link found. Skipping this job.")
