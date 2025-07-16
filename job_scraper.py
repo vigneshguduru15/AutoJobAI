@@ -1,41 +1,35 @@
 import os
-import requests
-import streamlit as st
+from serpapi import GoogleSearch
+from dotenv import load_dotenv
 
-def get_jobs(role="python developer", location="India", num_results=10):
-    api_key = st.secrets["SERPAPI_API_KEY"]
-    search_url = "https://serpapi.com/search.json"
+load_dotenv()
 
+def get_jobs(role, location="India", num_jobs=10):
     params = {
         "engine": "google_jobs",
-        "q": f"{role} in {location}",
-        "api_key": api_key,
-        "hl": "en"
+        "q": role,
+        "location": location,
+        "api_key": os.getenv("SERPAPI_API_KEY"),
     }
 
-    response = requests.get(search_url, params=params)
-    data = response.json()
+    search = GoogleSearch(params)
+    results = search.get_dict()
 
-    job_results = data.get("jobs_results", [])[:num_results]
-    valid_jobs = []
+    jobs = []
+    for job in results.get("jobs_results", []):
+        title = job.get("title")
+        link = job.get("related_links", [{}])[0].get("link") or job.get("apply_options", [{}])[0].get("link") or job.get("job_id")
+        description = job.get("description")
 
-    for job in job_results:
-        link = None
-
-        if "apply_options" in job and job["apply_options"]:
-            for option in job["apply_options"]:
-                if "link" in option:
-                    link = option["link"]
-                    break
-
-        if not link:
-            st.warning("⚠️ Invalid job link found. Skipping this job.")
+        # Skip if link or description is missing
+        if not link or not description:
+            print("⚠️ Invalid job link or description. Skipping this job.")
             continue
 
-        valid_jobs.append({
-            "title": job.get("title", "No Title"),
-            "description": job.get("description", ""),
-            "link": link
+        jobs.append({
+            "title": title,
+            "link": link if link.startswith("http") else f"https://www.google.com/search?q={role}+{location}",
+            "description": description
         })
 
-    return valid_jobs
+    return jobs

@@ -7,3 +7,4 @@ serpapi
 python-dotenv==1.0.1
 PyMuPDF==1.23.9
 requests
+google-search-results==2.4.2
