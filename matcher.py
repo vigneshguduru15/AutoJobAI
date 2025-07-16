@@ -1,11 +1,21 @@
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-def rank_jobs(resume_text, jobs):
-    texts = [resume_text] + [job["title"] for job in jobs]
-    vec = TfidfVectorizer().fit_transform(texts)
+def match_jobs(resume_text, jobs):
+    if not jobs:
+        return []
 
-    sim = cosine_similarity(vec[0:1], vec[1:]).flatten()
-    ranked = sorted(zip(jobs, sim), key=lambda x: x[1], reverse=True)
+    descriptions = [resume_text] + [job["description"] for job in jobs]
+    vectorizer = TfidfVectorizer().fit_transform(descriptions)
+    similarity = cosine_similarity(vectorizer[0:1], vectorizer[1:]).flatten()
 
-    return ranked
+    matched_jobs = []
+    for i, score in enumerate(similarity):
+        matched_jobs.append({
+            "title": jobs[i]["title"],
+            "link": jobs[i]["link"],
+            "score": round(float(score), 2)
+        })
+
+    return sorted(matched_jobs, key=lambda x: x["score"], reverse=True)
+
