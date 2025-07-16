@@ -21,3 +21,4 @@ def match_jobs(resume_text, jobs):
 
     return sorted(matched_jobs, key=lambda x: x["score"], reverse=True)
 
+
