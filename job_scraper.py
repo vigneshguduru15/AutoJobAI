@@ -1,35 +1,39 @@
 import os
 from serpapi import GoogleSearch
 from dotenv import load_dotenv
-
 load_dotenv()
 
-def get_jobs(role, location="India", num_jobs=10):
+SERP_API_KEY = os.getenv("SERPAPI_API_KEY")
+
+def get_jobs(query="software engineer", location="India", num_jobs=20):
+    if not SERP_API_KEY:
+        return []
+
     params = {
         "engine": "google_jobs",
-        "q": role,
+        "q": query,
         "location": location,
-        "api_key": os.getenv("SERPAPI_API_KEY"),
+        "api_key": SERP_API_KEY
     }
 
-    search = GoogleSearch(params)
-    results = search.get_dict()
+    try:
+        search = GoogleSearch(params)
+        results = search.get_dict()
+        jobs = results.get("jobs_results", [])
+        formatted_jobs = []
 
-    jobs = []
-    for job in results.get("jobs_results", []):
-        title = job.get("title")
-        link = job.get("related_links", [{}])[0].get("link") or job.get("apply_options", [{}])[0].get("link") or job.get("job_id")
-        description = job.get("description")
-
-        # Skip if link or description is missing
-        if not link or not description:
-            print("⚠️ Invalid job link or description. Skipping this job.")
-            continue
-
-        jobs.append({
-            "title": title,
-            "link": link if link.startswith("http") else f"https://www.google.com/search?q={role}+{location}",
-            "description": description
-        })
-
-    return jobs
+        for job in jobs[:num_jobs]:
+            if "title" in job and "company_name" in job and "job_id" in job:
+                link = job.get("related_links", [{}])[0].get("link") or job.get("job_highlights", [{}])[0].get("link")
+                link = link or job.get("via") or "#"
+                formatted_jobs.append({
+                    "title": job.get("title"),
+                    "company": job.get("company_name"),
+                    "description": job.get("description", ""),
+                    "location": job.get("location", "Remote"),
+                    "link": link
+                })
+        return formatted_jobs
+    except Exception as e:
+        print("Error fetching jobs:", e)
+        return []

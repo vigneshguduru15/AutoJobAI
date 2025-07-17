@@ -1,22 +1,27 @@
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-def match_jobs(resume_text, jobs):
-    if not resume_text or not jobs:
+def match_jobs(skills, jobs, top_n=10):
+    if not jobs:
         return []
 
-    descriptions = [resume_text] + [job["description"] for job in jobs]
-    vectorizer = TfidfVectorizer().fit_transform(descriptions)
-    similarity_scores = cosine_similarity(vectorizer[0:1], vectorizer[1:]).flatten()
+    skill_text = ' '.join(skills).lower()
 
-    matched_jobs = []
-    for idx, score in enumerate(similarity_scores):
-        job = jobs[idx]
-        matched_jobs.append({
-            "title": job.get("title", "No title"),
-            "link": job.get("link", ""),
-            "apply_options": job.get("apply_options", []),
-            "score": round(float(score), 2),
-        })
+    job_texts = []
+    for job in jobs:
+        content = f"{job.get('title', '')} {job.get('description', '')}".lower()
+        job_texts.append(content)
 
-    return sorted(matched_jobs, key=lambda x: x["score"], reverse=True)
+    vectorizer = TfidfVectorizer().fit([skill_text] + job_texts)
+    vectors = vectorizer.transform([skill_text] + job_texts)
+
+    similarities = cosine_similarity(vectors[0:1], vectors[1:]).flatten()
+
+    scored_jobs = []
+    for job, score in zip(jobs, similarities):
+        job['score'] = score
+        scored_jobs.append(job)
+
+    scored_jobs.sort(key=lambda x: x['score'], reverse=True)
+    return scored_jobs[:top_n]
+
