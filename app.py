@@ -20,7 +20,7 @@ load_dotenv()
 st.set_page_config(page_title="AutoJobAI", layout="centered")
 
 st.title("🤖 AutoJobAI - Smart Job Matcher")
-st.write("Upload your resume (mobile-friendly), and let AI match you with top job listings!")
+st.write("Upload your resume below (mobile-friendly), and let AI match you with top job listings!")
 
 # --- Session state ---
 if "location" not in st.session_state:
@@ -38,36 +38,41 @@ location = st.selectbox(
 )
 st.session_state["location"] = location
 
-# --- Uploadcare Widget (Auto-fetch) ---
+# --- Uploadcare Widget (Big, Centered, Auto-fetch) ---
 st.markdown("""
-<div id="uploadcare-widget"></div>
+<div style="text-align: center; margin: 25px 0;">
+  <h3 style="color: #00bfa5; font-size: 1.5em;">📄 Upload Resume Here</h3>
+  <input type="hidden"
+         role="uploadcare-uploader"
+         data-public-key="demopublickey"  <!-- Replace with your own Uploadcare key later -->
+         data-tabs="file url"
+         data-multiple="false"
+         data-clearable="true"
+         style="transform: scale(1.8); padding: 20px;">
+</div>
+
 <script>
 (function(){
   const script = document.createElement('script');
   script.src = "https://ucarecdn.com/libs/widget/3.x/uploadcare.full.min.js";
   script.async = true;
   script.onload = () => {
-    const input = document.createElement('input');
-    input.type = 'hidden';
-    input.setAttribute('role', 'uploadcare-uploader');
-    input.setAttribute('data-public-key', 'demopublickey');  // Replace with your Uploadcare key later
-    input.setAttribute('data-tabs', 'file url');
-    input.setAttribute('data-multiple', 'false');
-    input.setAttribute('data-clearable', 'true');
-    input.onchange = function() {
-      window.parent.postMessage({ fileUrl: this.value }, "*");
-    };
-    document.getElementById("uploadcare-widget").appendChild(input);
+    const input = document.querySelector('[role="uploadcare-uploader"]');
+    input.addEventListener('change', function(){
+      if (this.value) {
+        window.parent.postMessage({ fileUrl: this.value }, "*");
+      }
+    });
   };
   document.body.appendChild(script);
 })();
 </script>
 """, unsafe_allow_html=True)
 
-# --- Capture file URL from widget via Streamlit's on_event ---
+# --- Capture file URL from widget (auto) ---
 uploaded_url = st.experimental_get_query_params().get("fileUrl", [None])[0]
 
-# --- Automatically fetch and save uploaded file ---
+# --- Auto-download the uploaded file ---
 if uploaded_url and not st.session_state["resume_ready"]:
     try:
         temp_dir = tempfile.gettempdir()
@@ -87,7 +92,7 @@ if uploaded_url and not st.session_state["resume_ready"]:
         st.error(f"Failed to download resume: {e}")
         st.session_state["resume_ready"] = False
 
-# --- Process the resume once it's ready ---
+# --- Process resume once uploaded ---
 if st.session_state["resume_ready"] and st.session_state["resume_path"]:
     try:
         skills = parse_resume(st.session_state["resume_path"])
@@ -96,7 +101,7 @@ if st.session_state["resume_ready"] and st.session_state["resume_path"]:
         else:
             st.warning("No valid technical skills found. Searching generic jobs.")
 
-        # Suggest job role
+        # Suggest default role
         default_role = "Software Engineer"
         if "machine learning" in skills or "tensorflow" in skills:
             default_role = "Machine Learning Engineer"
@@ -107,7 +112,7 @@ if st.session_state["resume_ready"] and st.session_state["resume_path"]:
 
         preferred_role = st.text_input("💼 Enter your preferred job role/title:", value=default_role)
 
-        # Store jobs in session
+        # Job storage
         if "jobs" not in st.session_state:
             st.session_state["jobs"] = []
 
@@ -144,7 +149,7 @@ if st.session_state["resume_ready"] and st.session_state["resume_path"]:
                 for job in jobs[:10]:
                     display_job(job)
 
-            # Refresh jobs
+            # Refresh button
             if st.button("🔁 Refresh Jobs"):
                 st.info(f"Fetching more jobs for: **{preferred_role}** in {location}")
                 st.session_state["jobs"] = get_jobs(preferred_role or "Software Engineer", location=location)
@@ -152,4 +157,4 @@ if st.session_state["resume_ready"] and st.session_state["resume_path"]:
     except Exception as e:
         st.error(f"An error occurred while processing resume: {e}")
 else:
-    st.info("Upload your resume using the widget above to get started.")
+    st.info("Upload your resume using the big button above to get started.")
