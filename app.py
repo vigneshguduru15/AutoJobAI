@@ -1,4 +1,5 @@
 import os
+import subprocess
 import base64
 import streamlit as st
 from dotenv import load_dotenv
@@ -6,7 +7,13 @@ from resume_parser import parse_resume
 from matcher import match_jobs
 from job_scraper import get_jobs
 
-# Load environment variables
+# --- Ensure SpaCy model is available ---
+try:
+    import en_core_web_sm
+except ImportError:
+    subprocess.run(["python", "-m", "spacy", "download", "en_core_web_sm"])
+
+# --- Load environment variables ---
 load_dotenv()
 
 st.set_page_config(page_title="AutoJobAI", layout="centered")
@@ -14,11 +21,11 @@ st.set_page_config(page_title="AutoJobAI", layout="centered")
 st.title("🤖 AutoJobAI - Smart Job Matcher")
 st.write("Upload your resume, confirm upload, select your job role, and let AI match you with top job listings!")
 
-# Always use /tmp for uploads (safe for mobile + Streamlit Cloud)
+# Use /tmp for file uploads (works on Streamlit Cloud + mobile)
 UPLOAD_DIR = "/tmp"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# Track session state
+# Session state initialization
 if "location" not in st.session_state:
     st.session_state["location"] = "India"
 if "resume_uploaded" not in st.session_state:
@@ -26,7 +33,7 @@ if "resume_uploaded" not in st.session_state:
 if "resume_path" not in st.session_state:
     st.session_state["resume_path"] = None
 
-# Job location
+# Job location selection
 location = st.selectbox(
     "🌐 Select Job Location:",
     ["India", "United States", "United Kingdom", "Canada", "Remote"],
@@ -37,10 +44,10 @@ st.session_state["location"] = location
 # Upload file
 uploaded_file = st.file_uploader("📄 Upload your resume (PDF or DOCX)", type=["pdf", "docx"])
 
-# Wait for confirmation before processing
+# Confirm upload button (ensures full file received before parsing)
 if uploaded_file and st.button("Analyze Resume"):
     try:
-        # Convert to base64 and write to /tmp (for mobile reliability)
+        # Convert to base64 for stable mobile uploads, then save to /tmp
         file_bytes = uploaded_file.read()
         encoded = base64.b64encode(file_bytes).decode()
         resume_path = os.path.join(UPLOAD_DIR, uploaded_file.name)
@@ -54,17 +61,17 @@ if uploaded_file and st.button("Analyze Resume"):
     except Exception as e:
         st.error(f"Error processing resume: {e}")
 
-# Only continue if resume confirmed
+# Continue only if resume is confirmed
 if st.session_state["resume_uploaded"] and st.session_state["resume_path"]:
     try:
-        # Extract skills
+        # Extract skills from resume
         skills = parse_resume(st.session_state["resume_path"])
         if skills:
             st.write("🧠 **Extracted Skills:**", ", ".join(skills))
         else:
             st.warning("No valid technical skills found. Will search generic jobs.")
 
-        # Suggest a default role based on skills
+        # Suggest a default job role based on extracted skills
         default_role = "Software Engineer"
         if "machine learning" in skills or "tensorflow" in skills:
             default_role = "Machine Learning Engineer"
@@ -75,7 +82,7 @@ if st.session_state["resume_uploaded"] and st.session_state["resume_path"]:
 
         preferred_role = st.text_input("💼 Enter your preferred job role/title:", value=default_role)
 
-        # Session storage for job results
+        # Session for job results
         if "jobs" not in st.session_state:
             st.session_state["jobs"] = []
 
@@ -87,7 +94,7 @@ if st.session_state["resume_uploaded"] and st.session_state["resume_path"]:
 
         jobs = st.session_state["jobs"]
 
-        # Show job results
+        # Display job listings
         if jobs:
             matched_jobs = match_jobs(jobs, skills)
 
