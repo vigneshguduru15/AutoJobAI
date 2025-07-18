@@ -20,15 +20,15 @@ load_dotenv()
 st.set_page_config(page_title="AutoJobAI", layout="centered")
 
 st.title("🤖 AutoJobAI - Smart Job Matcher")
-st.write("Upload your resume (works on mobile & desktop), select your job role, and let AI match you with top job listings!")
+st.write("Upload your resume (mobile-friendly), and let AI match you with top job listings!")
 
-# --- Initialize session state ---
+# --- Session state ---
 if "location" not in st.session_state:
     st.session_state["location"] = "India"
-if "resume_uploaded" not in st.session_state:
-    st.session_state["resume_uploaded"] = False
 if "resume_path" not in st.session_state:
     st.session_state["resume_path"] = None
+if "resume_ready" not in st.session_state:
+    st.session_state["resume_ready"] = False
 
 # --- Job location selector ---
 location = st.selectbox(
@@ -38,8 +38,9 @@ location = st.selectbox(
 )
 st.session_state["location"] = location
 
-# --- Uploadcare Widget for Mobile/Desktop Upload ---
+# --- Uploadcare Widget (Auto-fetch) ---
 st.markdown("""
+<div id="uploadcare-widget"></div>
 <script>
 (function(){
   const script = document.createElement('script');
@@ -49,54 +50,53 @@ st.markdown("""
     const input = document.createElement('input');
     input.type = 'hidden';
     input.setAttribute('role', 'uploadcare-uploader');
-    input.setAttribute('data-public-key', 'demopublickey');  // Public demo key (you can replace with your own)
+    input.setAttribute('data-public-key', 'demopublickey');  // Replace with your Uploadcare key later
     input.setAttribute('data-tabs', 'file url');
     input.setAttribute('data-multiple', 'false');
     input.setAttribute('data-clearable', 'true');
-    document.body.appendChild(input);
+    input.onchange = function() {
+      window.parent.postMessage({ fileUrl: this.value }, "*");
+    };
+    document.getElementById("uploadcare-widget").appendChild(input);
   };
   document.body.appendChild(script);
 })();
 </script>
 """, unsafe_allow_html=True)
 
-st.markdown("After selecting a file, copy the Uploadcare file URL below:")
+# --- Capture file URL from widget via Streamlit's on_event ---
+uploaded_url = st.experimental_get_query_params().get("fileUrl", [None])[0]
 
-file_url = st.text_input("Paste your Uploadcare file URL here:")
-
-# --- Download file from Uploadcare once URL is provided ---
-if file_url and st.button("Confirm Resume Upload"):
+# --- Automatically fetch and save uploaded file ---
+if uploaded_url and not st.session_state["resume_ready"]:
     try:
         temp_dir = tempfile.gettempdir()
-        file_name = os.path.basename(file_url.split("?")[0]) or "resume.pdf"
+        file_name = os.path.basename(uploaded_url.split("?")[0]) or "resume.pdf"
         file_path = os.path.join(temp_dir, file_name)
 
-        # Download from Uploadcare CDN
-        r = requests.get(file_url, stream=True)
+        r = requests.get(uploaded_url, stream=True, timeout=60)
         with open(file_path, "wb") as f:
             for chunk in r.iter_content(chunk_size=1024 * 1024):  # 1MB chunks
                 f.write(chunk)
 
-        st.session_state["resume_uploaded"] = True
         st.session_state["resume_path"] = file_path
-        st.success(f"Resume downloaded and saved as '{file_name}'!")
+        st.session_state["resume_ready"] = True
+        st.success(f"Resume '{file_name}' uploaded successfully!")
 
     except Exception as e:
-        st.error(f"Failed to fetch resume: {e}")
-        st.session_state["resume_uploaded"] = False
-        st.session_state["resume_path"] = None
+        st.error(f"Failed to download resume: {e}")
+        st.session_state["resume_ready"] = False
 
-# --- Continue only after confirmed upload ---
-if st.session_state["resume_uploaded"] and st.session_state["resume_path"]:
+# --- Process the resume once it's ready ---
+if st.session_state["resume_ready"] and st.session_state["resume_path"]:
     try:
-        # Extract skills
         skills = parse_resume(st.session_state["resume_path"])
         if skills:
             st.write("🧠 **Extracted Skills:**", ", ".join(skills))
         else:
             st.warning("No valid technical skills found. Searching generic jobs.")
 
-        # Suggest default role based on skills
+        # Suggest job role
         default_role = "Software Engineer"
         if "machine learning" in skills or "tensorflow" in skills:
             default_role = "Machine Learning Engineer"
@@ -107,7 +107,7 @@ if st.session_state["resume_uploaded"] and st.session_state["resume_path"]:
 
         preferred_role = st.text_input("💼 Enter your preferred job role/title:", value=default_role)
 
-        # Job results session
+        # Store jobs in session
         if "jobs" not in st.session_state:
             st.session_state["jobs"] = []
 
@@ -150,6 +150,6 @@ if st.session_state["resume_uploaded"] and st.session_state["resume_path"]:
                 st.session_state["jobs"] = get_jobs(preferred_role or "Software Engineer", location=location)
 
     except Exception as e:
-        st.error(f"An error occurred: {e}")
+        st.error(f"An error occurred while processing resume: {e}")
 else:
-    st.warning("Upload your resume using Uploadcare, paste the file URL, and click **Confirm Resume Upload**.")
+    st.info("Upload your resume using the widget above to get started.")
