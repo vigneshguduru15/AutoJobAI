@@ -1,39 +1,49 @@
-import os
-from serpapi import GoogleSearch
-from dotenv import load_dotenv
-load_dotenv()
+# job_scraper.py
+import streamlit as st
+import requests
+import logging
 
-SERP_API_KEY = os.getenv("SERPAPI_API_KEY")
+def get_jobs(resume_skills=None, location="India", fallback=True, num_results=10):
+    api_key = st.secrets["rapidapi"]["api_key"]
 
-def get_jobs(query="software engineer", location="India", num_jobs=20):
-    if not SERP_API_KEY:
-        return []
+    url = "https://jsearch.p.rapidapi.com/search"
 
-    params = {
-        "engine": "google_jobs",
-        "q": query,
-        "location": location,
-        "api_key": SERP_API_KEY
+    # Use only top 5 skills for query
+    skills_query = " ".join(resume_skills[:5]) if resume_skills else "Python Developer"
+
+    querystring = {
+        "query": f"{skills_query} jobs in {location}",
+        "page": "1",
+        "num_pages": "1"
     }
 
-    try:
-        search = GoogleSearch(params)
-        results = search.get_dict()
-        jobs = results.get("jobs_results", [])
-        formatted_jobs = []
+    headers = {
+        "X-RapidAPI-Key": api_key,
+        "X-RapidAPI-Host": "jsearch.p.rapidapi.com"
+    }
 
-        for job in jobs[:num_jobs]:
-            if "title" in job and "company_name" in job and "job_id" in job:
-                link = job.get("related_links", [{}])[0].get("link") or job.get("job_highlights", [{}])[0].get("link")
-                link = link or job.get("via") or "#"
-                formatted_jobs.append({
-                    "title": job.get("title"),
-                    "company": job.get("company_name"),
-                    "description": job.get("description", ""),
-                    "location": job.get("location", "Remote"),
-                    "link": link
-                })
-        return formatted_jobs
-    except Exception as e:
-        print("Error fetching jobs:", e)
+    logging.warning(f"🔍 Running JSearch query: {querystring['query']}")
+
+    response = requests.get(url, headers=headers, params=querystring)
+    if response.status_code != 200:
+        logging.error(f"❌ API Error: {response.status_code}, {response.text}")
         return []
+
+    data = response.json()
+    results = data.get("data", [])
+    if not results and fallback:
+        logging.warning("⚠️ No results found. Retrying with fallback query...")
+        return get_jobs(resume_skills=["Software Engineer"], location=location, fallback=False)
+
+    jobs = []
+    for job in results[:num_results]:
+        jobs.append({
+            "title": job.get("job_title", "No Title"),
+            "company": job.get("employer_name", "Unknown"),
+            "location": job.get("job_city") or job.get("job_country") or "Unknown",
+            "description": (job.get("job_description", "")[:300] + "..."),
+            "apply_link": job.get("job_apply_link")
+        })
+
+    logging.info(f"✅ {len(jobs)} jobs fetched for {location}.")
+    return jobs

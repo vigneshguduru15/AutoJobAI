@@ -1,27 +1,20 @@
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
+# matcher.py
+def match_jobs(resume_skills, jobs):
+    matched_jobs = []
 
-def match_jobs(skills, jobs, top_n=10):
-    if not jobs:
-        return []
-
-    skill_text = ' '.join(skills).lower()
-
-    job_texts = []
     for job in jobs:
-        content = f"{job.get('title', '')} {job.get('description', '')}".lower()
-        job_texts.append(content)
+        score = 0
+        for skill in resume_skills:
+            if skill.lower() in job.get("title", "").lower() or skill.lower() in job.get("description", "").lower():
+                score += 1
 
-    vectorizer = TfidfVectorizer().fit([skill_text] + job_texts)
-    vectors = vectorizer.transform([skill_text] + job_texts)
+        matched_jobs.append({
+            "title": job.get("title", "No Title"),
+            "location": job.get("location", "Unknown"),
+            "description": job.get("description", ""),
+            "apply_link": job.get("apply_link"),
+            "score": score
+        })
 
-    similarities = cosine_similarity(vectors[0:1], vectors[1:]).flatten()
-
-    scored_jobs = []
-    for job, score in zip(jobs, similarities):
-        job['score'] = score
-        scored_jobs.append(job)
-
-    scored_jobs.sort(key=lambda x: x['score'], reverse=True)
-    return scored_jobs[:top_n]
-
+    matched_jobs.sort(key=lambda x: x["score"], reverse=True)
+    return matched_jobs[:10] if matched_jobs else []

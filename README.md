@@ -1,43 +1,46 @@
-# 🤖 AutoJobAI - Smart Job Finder
+# 🤖 AutoJobAI – Smart Job Matcher
 
-AutoJobAI is an AI-powered job-matching tool that helps users find the most relevant job listings based on their resume. Just upload your resume and enter your preferred job role — AutoJobAI does the rest by scraping Google Jobs and matching results using AI.
+![Streamlit](https://img.shields.io/badge/Built%20with-Streamlit-red?logo=streamlit)
+![Python](https://img.shields.io/badge/Python-3.9+-blue?logo=python)
+![RapidAPI](https://img.shields.io/badge/API-JSearch%20(RapidAPI)-brightgreen)
+![License](https://img.shields.io/badge/License-MIT-lightgrey)
+
+AutoJobAI is an AI-powered job matching tool that analyzes your resume (PDF/DOCX), extracts your skills using **SpaCy NLP**, and automatically fetches **real job listings** using the **JSearch API (via RapidAPI)**. It matches jobs based on your skills and location (India, United States, or Remote).
+
+Deployed using **Streamlit Cloud**.
 
 ---
 
 ## 🚀 Features
-
-- ✅ Upload PDF Resume
-- 🤖 Extract Skills using NLP
-- 🔍 Scrape Jobs from Google Jobs via SerpAPI
-- 📊 AI Matching Score for Each Job
-- 🔗 Clickable Job Application Links
-- 💡 Built with Streamlit, Python
-
----
-
-## 📦 Tech Stack
-
-- Python 🐍
-- Streamlit 📊
-- PyMuPDF + scikit-learn + SerpAPI
-- Resume Parser (NLP)
-- GitHub + Streamlit Cloud Deployment
+- Upload **PDF or DOCX resumes** (up to 200MB)
+- Extracts technical skills using **NLP (SpaCy)**
+- Fetches **real job listings** via **JSearch (RapidAPI)**
+- **Location selector** (India, US, or Remote)
+- Displays **top 10 skill-matched jobs** with:
+  - Job title
+  - Location
+  - Direct **Apply link**
 
 ---
 
-## 🧠 How It Works
-
-1. **Upload Resume** → Extracts keywords/skills
-2. **Enter Job Role** → You define your interest (e.g., `Python Developer`)
-3. **AI Matches Jobs** → Finds relevant jobs via SerpAPI and ranks them
-4. **Get Links to Apply** → Direct clickable job links in output
+## 🖥️ Live Demo
+👉 [**Launch AutoJobAI**](https://YOUR-USERNAME-autojobai.streamlit.app)  
+*(Replace with your actual Streamlit Cloud URL)*
 
 ---
 
-## 🛠️ Installation
+## 📸 Screenshots
 
+*(Add actual screenshots after deploying)*
+
+<img src="screenshots/upload.png" width="600">
+<img src="screenshots/results.png" width="600">
+
+---
+
+## 🛠️ Installation & Setup
+
+Clone the repo:
 ```bash
-git clone https://github.com/your-username/AutoJobAI.git
+git clone https://github.com/YOUR-USERNAME/AutoJobAI.git
 cd AutoJobAI
-pip install -r requirements.txt
-streamlit run app.py

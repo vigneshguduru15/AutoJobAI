@@ -1,33 +1,37 @@
-import pdfplumber
-import docx
-import spacy
+# resume_parser.py
+import docx2txt
 import fitz  # PyMuPDF
+import spacy
 
 nlp = spacy.load("en_core_web_sm")
 
-def extract_text_from_resume(file):
-    if file.name.endswith(".pdf"):
-        try:
-            text = ""
-            with pdfplumber.open(file) as pdf:
-                for page in pdf.pages:
-                    text += page.extract_text() or ""
-            if not text.strip():
-                doc = fitz.open(stream=file.read(), filetype="pdf")
-                for page in doc:
-                    text += page.get_text()
-            return text
-        except:
-            return ""
-    elif file.name.endswith(".docx"):
-        doc = docx.Document(file)
-        return "\n".join([para.text for para in doc.paragraphs])
-    return ""
+COMMON_SKILLS = {
+    "python", "java", "sql", "html", "css", "javascript",
+    "tensorflow", "pandas", "numpy", "flask", "streamlit",
+    "scikit-learn", "xgboost", "mongodb", "git", "docker",
+    "linux", "machine learning", "deep learning", "data analysis",
+    "mern stack", "web development", "ai", "ml", "nlp"
+}
 
-def extract_skills(text):
+def extract_text_from_pdf(file):
+    with fitz.open(stream=file.read(), filetype="pdf") as doc:
+        text = ""
+        for page in doc:
+            text += page.get_text()
+    return text
+
+def extract_text_from_docx(file):
+    return docx2txt.process(file)
+
+def extract_skills_from_resume(file):
+    filename = file.name.lower()
+    if filename.endswith(".pdf"):
+        text = extract_text_from_pdf(file)
+    elif filename.endswith(".docx"):
+        text = extract_text_from_docx(file)
+    else:
+        return []
+
     doc = nlp(text.lower())
-    tokens = [token.text for token in doc if not token.is_stop and not token.is_punct]
-    skills_list = ["python", "java", "c++", "html", "css", "javascript", "sql", "tensorflow", "pytorch", "sklearn",
-                   "pandas", "numpy", "flask", "django", "aws", "azure", "react", "node.js", "git", "linux", "docker"]
-    found = list(set([token for token in tokens if token in skills_list]))
-    return found
+    tokens = {token.text.strip() for token in doc if token.is_alpha and len(token.text) > 2}
+    return list(tokens & COMMON_SKILLS)
