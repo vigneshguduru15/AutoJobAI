@@ -1,37 +1,55 @@
-# resume_parser.py
-import docx2txt
-import fitz  # PyMuPDF
 import spacy
+from PyPDF2 import PdfReader
+from docx import Document
 
+# Load SpaCy model
 nlp = spacy.load("en_core_web_sm")
 
-COMMON_SKILLS = {
-    "python", "java", "sql", "html", "css", "javascript",
-    "tensorflow", "pandas", "numpy", "flask", "streamlit",
-    "scikit-learn", "xgboost", "mongodb", "git", "docker",
-    "linux", "machine learning", "deep learning", "data analysis",
-    "mern stack", "web development", "ai", "ml", "nlp"
-}
+# Valid tech skills list
+TECH_KEYWORDS = [
+    "python", "java", "c++", "sql", "mongodb", "aws", "linux",
+    "docker", "machine learning", "deep learning", "tensorflow",
+    "pytorch", "keras", "pandas", "numpy", "react", "react.js",
+    "node.js", "javascript", "html", "css", "flask", "django",
+    "streamlit", "fastapi", "xgboost", "data science", "aiml",
+    "artificial intelligence", "scikit-learn"
+]
 
-def extract_text_from_pdf(file):
-    with fitz.open(stream=file.read(), filetype="pdf") as doc:
+def extract_text_from_pdf(file_path):
+    try:
         text = ""
-        for page in doc:
-            text += page.get_text()
-    return text
+        with open(file_path, "rb") as f:
+            reader = PdfReader(f)
+            for page in reader.pages:
+                text += page.extract_text() or ""
+        return text
+    except:
+        return ""
 
-def extract_text_from_docx(file):
-    return docx2txt.process(file)
+def extract_text_from_docx(file_path):
+    try:
+        doc = Document(file_path)
+        return "\n".join([p.text for p in doc.paragraphs])
+    except:
+        return ""
 
-def extract_skills_from_resume(file):
-    filename = file.name.lower()
-    if filename.endswith(".pdf"):
-        text = extract_text_from_pdf(file)
-    elif filename.endswith(".docx"):
-        text = extract_text_from_docx(file)
-    else:
+def parse_resume(file_path):
+    """Extract only tech-related skills from resume."""
+    text = ""
+    if file_path.lower().endswith(".pdf"):
+        text = extract_text_from_pdf(file_path)
+    elif file_path.lower().endswith(".docx"):
+        text = extract_text_from_docx(file_path)
+
+    if not text:
         return []
 
     doc = nlp(text.lower())
-    tokens = {token.text.strip() for token in doc if token.is_alpha and len(token.text) > 2}
-    return list(tokens & COMMON_SKILLS)
+    tokens = set([token.text for token in doc if token.is_alpha])
+
+    skills = []
+    for keyword in TECH_KEYWORDS:
+        if any(k in tokens for k in keyword.lower().split()):
+            skills.append(keyword)
+
+    return list(dict.fromkeys(skills))  # Deduplicated

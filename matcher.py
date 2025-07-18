@@ -1,20 +1,17 @@
-# matcher.py
-def match_jobs(resume_skills, jobs):
-    matched_jobs = []
-
+def match_jobs(jobs, skills):
+    """Score jobs by overlap with extracted skills."""
+    matched = []
     for job in jobs:
         score = 0
-        for skill in resume_skills:
-            if skill.lower() in job.get("title", "").lower() or skill.lower() in job.get("description", "").lower():
+        desc = (job.get("description") or "").lower()
+        title = (job.get("title") or "").lower()
+
+        for skill in skills:
+            if skill.lower() in desc or skill.lower() in title:
                 score += 1
 
-        matched_jobs.append({
-            "title": job.get("title", "No Title"),
-            "location": job.get("location", "Unknown"),
-            "description": job.get("description", ""),
-            "apply_link": job.get("apply_link"),
-            "score": score
-        })
+        job["match_score"] = score
+        matched.append(job)
 
-    matched_jobs.sort(key=lambda x: x["score"], reverse=True)
-    return matched_jobs[:10] if matched_jobs else []
+    return sorted(matched, key=lambda x: x["match_score"], reverse=True)
+    return matched

@@ -1,50 +1,107 @@
-# app.py
-
+import os
 import streamlit as st
 from dotenv import load_dotenv
-from resume_parser import extract_skills_from_resume
-from job_scraper import get_jobs
+from resume_parser import parse_resume
 from matcher import match_jobs
+from job_scraper import get_jobs
 
+# Load environment variables
 load_dotenv()
 
 st.set_page_config(page_title="AutoJobAI", layout="centered")
+
 st.title("🤖 AutoJobAI - Smart Job Matcher")
-st.markdown("Upload your resume and let AI match you with top job listings!")
+st.write("Upload your resume, select your preferred job role, and let AI match you with top job listings!")
 
-# Location selector (default: India)
+# Handle session state for location
+if "location" not in st.session_state:
+    st.session_state["location"] = "India"
+
 location = st.selectbox(
-    "🌍 Select Job Location:",
-    ["India", "United States", "Remote"],
-    index=0
+    "🌐 Select Job Location:",
+    ["India", "United States", "United Kingdom", "Canada", "Remote"],
+    index=["India", "United States", "United Kingdom", "Canada", "Remote"].index(st.session_state["location"])
 )
+st.session_state["location"] = location
 
-# Upload Resume
+# Upload resume
 uploaded_file = st.file_uploader("📄 Upload your resume (PDF or DOCX)", type=["pdf", "docx"])
 
-if uploaded_file is not None:
-    with st.spinner("🔍 Analyzing your resume..."):
-        resume_skills = extract_skills_from_resume(uploaded_file)
-        st.success("✅ Resume analyzed successfully!")
-        st.markdown("### 🧠 Extracted Skills:")
-        st.write(", ".join(resume_skills) if resume_skills else "No skills found.")
+if uploaded_file:
+    # Save resume locally (for mobile support)
+    resume_path = os.path.join(os.getcwd(), "uploaded_resume." + uploaded_file.name.split(".")[-1])
+    with open(resume_path, "wb") as f:
+        f.write(uploaded_file.read())
 
-        with st.spinner(f"🔎 Fetching jobs in {location} via RapidAPI..."):
-            jobs = get_jobs(resume_skills=resume_skills, location=location)
-            if not jobs:
-                st.warning("⚠️ No jobs fetched. Try again later or check your API key.")
+    st.success("Resume uploaded successfully! Analyzing your skills...")
+
+    try:
+        # Extract skills
+        skills = parse_resume(resume_path)
+
+        if skills:
+            st.write("🧠 **Extracted Skills:**", ", ".join(skills))
+        else:
+            st.warning("No valid technical skills found. Will search generic jobs.")
+
+        # Suggest default job role based on skills
+        default_role = "Software Engineer"
+        if "machine learning" in skills or "tensorflow" in skills:
+            default_role = "Machine Learning Engineer"
+        elif "react" in skills or "node.js" in skills:
+            default_role = "Full Stack Developer"
+        elif "aws" in skills or "mongodb" in skills:
+            default_role = "Backend Developer"
+
+        # Let user confirm or edit job role
+        preferred_role = st.text_input(
+            "💼 Enter your preferred job role/title:",
+            value=default_role
+        )
+
+        # Store jobs in session so user can refresh without re-upload
+        if "jobs" not in st.session_state:
+            st.session_state["jobs"] = []
+
+        # Fetch jobs when "Find Jobs" is clicked
+        if st.button("Find Jobs"):
+            st.info(f"Searching jobs for: **{preferred_role}** in {location}")
+            query = preferred_role if preferred_role else "Software Engineer"
+            st.session_state["jobs"] = get_jobs(query=query, location=location)
+
+        jobs = st.session_state["jobs"]
+
+        # Display job listings if any exist
+        if jobs:
+            matched_jobs = match_jobs(jobs, skills)
+
+            def display_job(job):
+                title = job.get("title", "No Title")
+                company = job.get("company_name", "Unknown")
+                desc = job.get("description", "No description available.")
+                link = job.get("apply_link") or "#"
+
+                st.markdown(f"### {title}")
+                st.write(f"**Company:** {company}")
+                st.write(desc[:250] + "...")
+                if link and link != "#":
+                    st.markdown(f"[**👉 Apply Here**]({link})", unsafe_allow_html=True)
+                st.write("---")
+
+            st.subheader("Top Matching Jobs")
+            if matched_jobs:
+                for job in matched_jobs[:10]:
+                    display_job(job)
             else:
-                matched_jobs = match_jobs(resume_skills, jobs)
+                st.info("No strong matches found. Showing all jobs.")
+                for job in jobs[:10]:
+                    display_job(job)
 
-                if matched_jobs:
-                    st.markdown("## 🎯 Top Matching Jobs")
-                    for job in matched_jobs:
-                        st.markdown(f"**{job['title']}**")
-                        st.markdown(f"📍 {job['location']}")
-                        if job["apply_link"]:
-                            st.markdown(f"[🔗 Apply Now]({job['apply_link']})", unsafe_allow_html=True)
-                        else:
-                            st.warning("⚠️ No valid apply link found.")
-                        st.markdown("---")
-                else:
-                    st.warning("⚠️ No matched jobs found. Try uploading a different resume.")
+            # "Refresh Jobs" button now appears BELOW job listings
+            if st.button("🔁 Refresh Jobs"):
+                st.info(f"Fetching more jobs for: **{preferred_role}** in {location}")
+                query = preferred_role if preferred_role else "Software Engineer"
+                st.session_state["jobs"] = get_jobs(query=query, location=location)
+
+    except Exception as e:
+        st.error(f"An error occurred: {e}")

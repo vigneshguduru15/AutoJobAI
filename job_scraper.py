@@ -1,49 +1,70 @@
-# job_scraper.py
-import streamlit as st
+import os
 import requests
 import logging
+import random
+from dotenv import load_dotenv
 
-def get_jobs(resume_skills=None, location="India", fallback=True, num_results=10):
-    api_key = st.secrets["rapidapi"]["api_key"]
+# Load environment variables
+load_dotenv()
+logging.basicConfig(level=logging.INFO)
 
-    url = "https://jsearch.p.rapidapi.com/search"
+RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY")
+RAPIDAPI_HOST = os.getenv("RAPIDAPI_HOST", "jsearch.p.rapidapi.com")
 
-    # Use only top 5 skills for query
-    skills_query = " ".join(resume_skills[:5]) if resume_skills else "Python Developer"
+COUNTRY_MAP = {
+    "India": "in",
+    "United States": "us",
+    "United Kingdom": "gb",
+    "Canada": "ca",
+    "Remote": "us"
+}
 
-    querystring = {
-        "query": f"{skills_query} jobs in {location}",
-        "page": "1",
-        "num_pages": "1"
-    }
+def get_jobs(query="Software Engineer", location="India"):
+    """Fetch job listings from RapidAPI (JSearch) with random page for freshness."""
+    country_code = COUNTRY_MAP.get(location, "us")
+    query = " ".join(query.split()[:5])  # Limit query length
+    url = f"https://{RAPIDAPI_HOST}/search"
+
+    # Pick a random page (1 to 3) to vary results each time
+    page_num = random.randint(1, 3)
 
     headers = {
-        "X-RapidAPI-Key": api_key,
-        "X-RapidAPI-Host": "jsearch.p.rapidapi.com"
+        "X-RapidAPI-Key": RAPIDAPI_KEY,
+        "X-RapidAPI-Host": RAPIDAPI_HOST
+    }
+    params = {
+        "query": f"{query} in {location}",
+        "num_pages": 1,
+        "page": page_num,
+        "country": country_code,
+        "language": "en"
     }
 
-    logging.warning(f"🔍 Running JSearch query: {querystring['query']}")
+    try:
+        response = requests.get(url, headers=headers, params=params)
+        if response.status_code != 200:
+            logging.error(f"API Error {response.status_code}: {response.text}")
+            return []
 
-    response = requests.get(url, headers=headers, params=querystring)
-    if response.status_code != 200:
-        logging.error(f"❌ API Error: {response.status_code}, {response.text}")
+        data = response.json()
+        jobs = data.get("data", [])
+
+        # Normalize job fields and guarantee a link
+        for job in jobs:
+            title = job.get("job_title", "No Title")
+            company = job.get("employer_name", "Unknown")
+            job["title"] = title
+            job["company_name"] = company
+            job["description"] = job.get("job_description", "No description available.")
+            job["apply_link"] = (
+                job.get("job_apply_link")
+                or job.get("job_posting_url")
+                or job.get("job_link")
+                or f"https://www.google.com/search?q={title.replace(' ', '+')}+{company.replace(' ', '+')}+job"
+            )
+
+        logging.info(f"Fetched {len(jobs)} jobs (page {page_num}) for '{query}' in {location}")
+        return jobs
+    except Exception as e:
+        logging.error(f"Job fetch failed: {e}")
         return []
-
-    data = response.json()
-    results = data.get("data", [])
-    if not results and fallback:
-        logging.warning("⚠️ No results found. Retrying with fallback query...")
-        return get_jobs(resume_skills=["Software Engineer"], location=location, fallback=False)
-
-    jobs = []
-    for job in results[:num_results]:
-        jobs.append({
-            "title": job.get("job_title", "No Title"),
-            "company": job.get("employer_name", "Unknown"),
-            "location": job.get("job_city") or job.get("job_country") or "Unknown",
-            "description": (job.get("job_description", "")[:300] + "..."),
-            "apply_link": job.get("job_apply_link")
-        })
-
-    logging.info(f"✅ {len(jobs)} jobs fetched for {location}.")
-    return jobs
