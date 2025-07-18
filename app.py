@@ -20,7 +20,7 @@ load_dotenv()
 st.set_page_config(page_title="AutoJobAI", layout="centered")
 
 st.title("🤖 AutoJobAI - Smart Job Matcher")
-st.write("Upload your resume below (mobile-friendly), and let AI match you with top job listings!")
+st.write("Upload your resume below (PDF or DOCX), and let AI match you with top job listings!")
 
 # --- Session state ---
 if "location" not in st.session_state:
@@ -38,17 +38,19 @@ location = st.selectbox(
 )
 st.session_state["location"] = location
 
-# --- Uploadcare Widget (Big, Centered, Auto-fetch) ---
+# --- Uploadcare Widget (Styled, PDF+DOCX Friendly) ---
 st.markdown("""
-<div style="text-align: center; margin: 25px 0;">
-  <h3 style="color: #00bfa5; font-size: 1.5em;">📄 Upload Resume Here</h3>
+<div style="text-align: center; margin: 30px 0;">
+  <h3 style="color: #00bfa5; font-size: 1.5em;">📄 Upload Your Resume</h3>
   <input type="hidden"
          role="uploadcare-uploader"
          data-public-key="demopublickey"  <!-- Replace with your own Uploadcare key later -->
          data-tabs="file url"
          data-multiple="false"
          data-clearable="true"
-         style="transform: scale(1.8); padding: 20px;">
+         data-mimetypes="application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+         style="border: 2px solid #00bfa5; padding: 18px; border-radius: 8px; transform: scale(1.4);">
+  <p style="color: #666; font-size: 0.9em; margin-top: 10px;">Supported formats: PDF, DOCX</p>
 </div>
 
 <script>
@@ -69,10 +71,10 @@ st.markdown("""
 </script>
 """, unsafe_allow_html=True)
 
-# --- Capture file URL from widget (auto) ---
+# --- Capture file URL from widget ---
 uploaded_url = st.experimental_get_query_params().get("fileUrl", [None])[0]
 
-# --- Auto-download the uploaded file ---
+# --- Download uploaded file automatically ---
 if uploaded_url and not st.session_state["resume_ready"]:
     try:
         temp_dir = tempfile.gettempdir()
@@ -92,7 +94,7 @@ if uploaded_url and not st.session_state["resume_ready"]:
         st.error(f"Failed to download resume: {e}")
         st.session_state["resume_ready"] = False
 
-# --- Process resume once uploaded ---
+# --- Process the resume when ready ---
 if st.session_state["resume_ready"] and st.session_state["resume_path"]:
     try:
         skills = parse_resume(st.session_state["resume_path"])
@@ -112,7 +114,7 @@ if st.session_state["resume_ready"] and st.session_state["resume_path"]:
 
         preferred_role = st.text_input("💼 Enter your preferred job role/title:", value=default_role)
 
-        # Job storage
+        # Store jobs
         if "jobs" not in st.session_state:
             st.session_state["jobs"] = []
 
@@ -123,7 +125,7 @@ if st.session_state["resume_ready"] and st.session_state["resume_path"]:
 
         jobs = st.session_state["jobs"]
 
-        # Display jobs
+        # Display job results
         if jobs:
             matched_jobs = match_jobs(jobs, skills)
 
@@ -149,7 +151,7 @@ if st.session_state["resume_ready"] and st.session_state["resume_path"]:
                 for job in jobs[:10]:
                     display_job(job)
 
-            # Refresh button
+            # Refresh jobs
             if st.button("🔁 Refresh Jobs"):
                 st.info(f"Fetching more jobs for: **{preferred_role}** in {location}")
                 st.session_state["jobs"] = get_jobs(preferred_role or "Software Engineer", location=location)
@@ -157,4 +159,4 @@ if st.session_state["resume_ready"] and st.session_state["resume_path"]:
     except Exception as e:
         st.error(f"An error occurred while processing resume: {e}")
 else:
-    st.info("Upload your resume using the big button above to get started.")
+    st.info("Upload your PDF or DOCX resume above to get started.")
