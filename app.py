@@ -1,6 +1,6 @@
 import os
 import subprocess
-import base64
+import tempfile
 import streamlit as st
 from dotenv import load_dotenv
 from resume_parser import parse_resume
@@ -19,13 +19,9 @@ load_dotenv()
 st.set_page_config(page_title="AutoJobAI", layout="centered")
 
 st.title("🤖 AutoJobAI - Smart Job Matcher")
-st.write("Upload your resume, confirm upload, select your job role, and let AI match you with top job listings!")
+st.write("Upload your resume (mobile-friendly), select your job role, and let AI match you with top job listings!")
 
-# Use /tmp for file uploads (works on Streamlit Cloud + mobile)
-UPLOAD_DIR = "/tmp"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-# Session state initialization
+# --- Initialize session state ---
 if "location" not in st.session_state:
     st.session_state["location"] = "India"
 if "resume_uploaded" not in st.session_state:
@@ -33,7 +29,7 @@ if "resume_uploaded" not in st.session_state:
 if "resume_path" not in st.session_state:
     st.session_state["resume_path"] = None
 
-# Job location selection
+# --- Job location selector ---
 location = st.selectbox(
     "🌐 Select Job Location:",
     ["India", "United States", "United Kingdom", "Canada", "Remote"],
@@ -41,27 +37,35 @@ location = st.selectbox(
 )
 st.session_state["location"] = location
 
-# Upload file
-uploaded_file = st.file_uploader("📄 Upload your resume (PDF or DOCX)", type=["pdf", "docx"])
+# --- Custom Mobile-Friendly Resume Upload ---
+def handle_resume_upload():
+    uploaded_file = st.file_uploader("📄 Upload your resume (PDF or DOCX)", type=["pdf", "docx"])
+    if uploaded_file:
+        try:
+            # Save directly to a temporary file (chunked write to avoid mobile timeouts)
+            temp_dir = tempfile.gettempdir()
+            file_path = os.path.join(temp_dir, uploaded_file.name)
+            with open(file_path, "wb") as f:
+                while True:
+                    chunk = uploaded_file.read(1024 * 1024)  # 1MB chunks
+                    if not chunk:
+                        break
+                    f.write(chunk)
 
-# Confirm upload button (ensures full file received before parsing)
-if uploaded_file and st.button("Analyze Resume"):
-    try:
-        # Convert to base64 for stable mobile uploads, then save to /tmp
-        file_bytes = uploaded_file.read()
-        encoded = base64.b64encode(file_bytes).decode()
-        resume_path = os.path.join(UPLOAD_DIR, uploaded_file.name)
-        with open(resume_path, "wb") as f:
-            f.write(base64.b64decode(encoded))
+            # Persist in session
+            st.session_state["resume_uploaded"] = True
+            st.session_state["resume_path"] = file_path
+            st.success(f"Resume '{uploaded_file.name}' uploaded successfully!")
 
-        st.session_state["resume_uploaded"] = True
-        st.session_state["resume_path"] = resume_path
-        st.success(f"Resume '{uploaded_file.name}' uploaded and saved successfully!")
+        except Exception as e:
+            st.error(f"Upload failed: {e}")
+            st.session_state["resume_uploaded"] = False
+            st.session_state["resume_path"] = None
 
-    except Exception as e:
-        st.error(f"Error processing resume: {e}")
+# --- Call uploader ---
+handle_resume_upload()
 
-# Continue only if resume is confirmed
+# --- Continue only if resume confirmed ---
 if st.session_state["resume_uploaded"] and st.session_state["resume_path"]:
     try:
         # Extract skills from resume
@@ -71,7 +75,7 @@ if st.session_state["resume_uploaded"] and st.session_state["resume_path"]:
         else:
             st.warning("No valid technical skills found. Will search generic jobs.")
 
-        # Suggest a default job role based on extracted skills
+        # Suggest default role based on skills
         default_role = "Software Engineer"
         if "machine learning" in skills or "tensorflow" in skills:
             default_role = "Machine Learning Engineer"
@@ -86,7 +90,7 @@ if st.session_state["resume_uploaded"] and st.session_state["resume_path"]:
         if "jobs" not in st.session_state:
             st.session_state["jobs"] = []
 
-        # Find jobs button
+        # Fetch jobs when clicked
         if st.button("Find Jobs"):
             st.info(f"Searching jobs for: **{preferred_role}** in {location}")
             query = preferred_role if preferred_role else "Software Engineer"
@@ -129,4 +133,4 @@ if st.session_state["resume_uploaded"] and st.session_state["resume_path"]:
     except Exception as e:
         st.error(f"An error occurred: {e}")
 else:
-    st.warning("Please upload and confirm your resume before finding jobs.")
+    st.warning("Please upload your resume to find matching jobs.")
