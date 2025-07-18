@@ -13,6 +13,10 @@ st.set_page_config(page_title="AutoJobAI", layout="centered")
 st.title("🤖 AutoJobAI - Smart Job Matcher")
 st.write("Upload your resume, select your preferred job role, and let AI match you with top job listings!")
 
+# Permanent storage for resumes (works on mobile & Streamlit Cloud)
+UPLOAD_DIR = os.path.join(os.getcwd(), "user_resumes")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
 # Handle session state for location
 if "location" not in st.session_state:
     st.session_state["location"] = "India"
@@ -24,19 +28,18 @@ location = st.selectbox(
 )
 st.session_state["location"] = location
 
-# Upload resume
+# File uploader (always required)
 uploaded_file = st.file_uploader("📄 Upload your resume (PDF or DOCX)", type=["pdf", "docx"])
 
 if uploaded_file:
-    # Save resume locally (for mobile support)
-    resume_path = os.path.join(os.getcwd(), "uploaded_resume." + uploaded_file.name.split(".")[-1])
+    # Save uploaded resume permanently for processing
+    resume_path = os.path.join(UPLOAD_DIR, uploaded_file.name)
     with open(resume_path, "wb") as f:
         f.write(uploaded_file.read())
-
-    st.success("Resume uploaded successfully! Analyzing your skills...")
+    st.success(f"Resume '{uploaded_file.name}' uploaded successfully!")
 
     try:
-        # Extract skills
+        # Extract skills from resume
         skills = parse_resume(resume_path)
 
         if skills:
@@ -44,7 +47,7 @@ if uploaded_file:
         else:
             st.warning("No valid technical skills found. Will search generic jobs.")
 
-        # Suggest default job role based on skills
+        # Suggest a default job role based on skills
         default_role = "Software Engineer"
         if "machine learning" in skills or "tensorflow" in skills:
             default_role = "Machine Learning Engineer"
@@ -59,7 +62,7 @@ if uploaded_file:
             value=default_role
         )
 
-        # Store jobs in session so user can refresh without re-upload
+        # Store jobs so user can refresh without re-uploading
         if "jobs" not in st.session_state:
             st.session_state["jobs"] = []
 
@@ -97,7 +100,7 @@ if uploaded_file:
                 for job in jobs[:10]:
                     display_job(job)
 
-            # "Refresh Jobs" button now appears BELOW job listings
+            # Refresh button below results
             if st.button("🔁 Refresh Jobs"):
                 st.info(f"Fetching more jobs for: **{preferred_role}** in {location}")
                 query = preferred_role if preferred_role else "Software Engineer"
@@ -105,3 +108,6 @@ if uploaded_file:
 
     except Exception as e:
         st.error(f"An error occurred: {e}")
+
+else:
+    st.warning("Please upload your resume to find matching jobs.")
