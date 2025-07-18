@@ -1,6 +1,7 @@
 import os
 import subprocess
 import tempfile
+import time
 import streamlit as st
 from dotenv import load_dotenv
 from resume_parser import parse_resume
@@ -37,22 +38,33 @@ location = st.selectbox(
 )
 st.session_state["location"] = location
 
-# --- Custom Mobile-Friendly Resume Upload ---
+# --- Robust Mobile-Friendly Resume Upload ---
 def handle_resume_upload():
     uploaded_file = st.file_uploader("📄 Upload your resume (PDF or DOCX)", type=["pdf", "docx"])
-    if uploaded_file:
-        try:
-            # Save directly to a temporary file (chunked write to avoid mobile timeouts)
-            temp_dir = tempfile.gettempdir()
-            file_path = os.path.join(temp_dir, uploaded_file.name)
-            with open(file_path, "wb") as f:
-                while True:
-                    chunk = uploaded_file.read(1024 * 1024)  # 1MB chunks
-                    if not chunk:
-                        break
-                    f.write(chunk)
 
-            # Persist in session
+    if uploaded_file:
+        temp_dir = tempfile.gettempdir()
+        file_path = os.path.join(temp_dir, uploaded_file.name)
+
+        try:
+            # Retry mechanism to ensure the file is fully written
+            for attempt in range(3):  # Retry up to 3 times
+                try:
+                    with open(file_path, "wb") as f:
+                        while True:
+                            chunk = uploaded_file.read(1024 * 1024)  # 1MB chunks
+                            if not chunk:
+                                break
+                            f.write(chunk)
+                    if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
+                        break  # Success
+                except Exception:
+                    time.sleep(1)  # Wait before retry
+            else:
+                st.error("Upload failed after multiple attempts. Please try again.")
+                return
+
+            # Persist path in session
             st.session_state["resume_uploaded"] = True
             st.session_state["resume_path"] = file_path
             st.success(f"Resume '{uploaded_file.name}' uploaded successfully!")
@@ -65,7 +77,7 @@ def handle_resume_upload():
 # --- Call uploader ---
 handle_resume_upload()
 
-# --- Continue only if resume confirmed ---
+# --- Continue only if resume is confirmed ---
 if st.session_state["resume_uploaded"] and st.session_state["resume_path"]:
     try:
         # Extract skills from resume
