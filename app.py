@@ -1,6 +1,7 @@
 import os
 import subprocess
 import tempfile
+import requests
 import streamlit as st
 from dotenv import load_dotenv
 from resume_parser import parse_resume
@@ -19,7 +20,7 @@ load_dotenv()
 st.set_page_config(page_title="AutoJobAI", layout="centered")
 
 st.title("🤖 AutoJobAI - Smart Job Matcher")
-st.write("Upload your resume, confirm the upload, and let AI match you with top job listings!")
+st.write("Upload your resume (works on mobile & desktop), select your job role, and let AI match you with top job listings!")
 
 # --- Initialize session state ---
 if "location" not in st.session_state:
@@ -37,31 +38,58 @@ location = st.selectbox(
 )
 st.session_state["location"] = location
 
-# --- Step 1: Upload resume (but don't process yet) ---
-uploaded_file = st.file_uploader("📄 Upload your resume (PDF or DOCX)", type=["pdf", "docx"])
+# --- Uploadcare Widget for Mobile/Desktop Upload ---
+st.markdown("""
+<script>
+(function(){
+  const script = document.createElement('script');
+  script.src = "https://ucarecdn.com/libs/widget/3.x/uploadcare.full.min.js";
+  script.async = true;
+  script.onload = () => {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.setAttribute('role', 'uploadcare-uploader');
+    input.setAttribute('data-public-key', 'demopublickey');  // Public demo key (you can replace with your own)
+    input.setAttribute('data-tabs', 'file url');
+    input.setAttribute('data-multiple', 'false');
+    input.setAttribute('data-clearable', 'true');
+    document.body.appendChild(input);
+  };
+  document.body.appendChild(script);
+})();
+</script>
+""", unsafe_allow_html=True)
 
-# --- Step 2: Confirm upload to process the file ---
-if uploaded_file and st.button("Confirm Resume"):
+st.markdown("After selecting a file, copy the Uploadcare file URL below:")
+
+file_url = st.text_input("Paste your Uploadcare file URL here:")
+
+# --- Download file from Uploadcare once URL is provided ---
+if file_url and st.button("Confirm Resume Upload"):
     try:
-        # Save the uploaded file to a temporary directory
         temp_dir = tempfile.gettempdir()
-        file_path = os.path.join(temp_dir, uploaded_file.name)
+        file_name = os.path.basename(file_url.split("?")[0]) or "resume.pdf"
+        file_path = os.path.join(temp_dir, file_name)
+
+        # Download from Uploadcare CDN
+        r = requests.get(file_url, stream=True)
         with open(file_path, "wb") as f:
-            f.write(uploaded_file.getbuffer())
+            for chunk in r.iter_content(chunk_size=1024 * 1024):  # 1MB chunks
+                f.write(chunk)
 
         st.session_state["resume_uploaded"] = True
         st.session_state["resume_path"] = file_path
-        st.success(f"Resume '{uploaded_file.name}' saved successfully!")
+        st.success(f"Resume downloaded and saved as '{file_name}'!")
 
     except Exception as e:
-        st.error(f"Failed to save resume: {e}")
+        st.error(f"Failed to fetch resume: {e}")
         st.session_state["resume_uploaded"] = False
         st.session_state["resume_path"] = None
 
-# --- Continue only after confirmation ---
+# --- Continue only after confirmed upload ---
 if st.session_state["resume_uploaded"] and st.session_state["resume_path"]:
     try:
-        # Extract skills from the confirmed resume
+        # Extract skills
         skills = parse_resume(st.session_state["resume_path"])
         if skills:
             st.write("🧠 **Extracted Skills:**", ", ".join(skills))
@@ -124,4 +152,4 @@ if st.session_state["resume_uploaded"] and st.session_state["resume_path"]:
     except Exception as e:
         st.error(f"An error occurred: {e}")
 else:
-    st.warning("Upload your resume and click **Confirm Resume** to proceed.")
+    st.warning("Upload your resume using Uploadcare, paste the file URL, and click **Confirm Resume Upload**.")
