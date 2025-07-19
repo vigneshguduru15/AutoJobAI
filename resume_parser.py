@@ -1,54 +1,34 @@
-# resume_parser.py
 import spacy
 from PyPDF2 import PdfReader
 from docx import Document
 
-# Load SpaCy NLP model
 nlp = spacy.load("en_core_web_sm")
 
 TECH_KEYWORDS = [
-    "python", "java", "c++", "sql", "mongodb", "aws", "linux", "docker",
-    "machine learning", "deep learning", "tensorflow", "pytorch", "keras",
-    "pandas", "numpy", "react", "react.js", "node.js", "javascript",
-    "html", "css", "flask", "django", "streamlit", "fastapi", "xgboost",
-    "data science", "aiml", "artificial intelligence", "scikit-learn"
+    "python","java","c++","sql","mongodb","aws","linux",
+    "docker","machine learning","deep learning","tensorflow",
+    "pytorch","keras","pandas","numpy","react","node.js",
+    "javascript","html","css","flask","django","streamlit",
+    "fastapi","xgboost","data science","aiml"
 ]
 
-def extract_text_from_pdf(file_path):
+def extract_text(path):
+    text = ""
     try:
-        text = ""
-        with open(file_path, "rb") as f:
-            reader = PdfReader(f)
+        if path.lower().endswith(".pdf"):
+            reader = PdfReader(path)
             for page in reader.pages:
                 text += page.extract_text() or ""
-        return text
+        elif path.lower().endswith(".docx"):
+            doc = Document(path)
+            text += "\n".join(p.text for p in doc.paragraphs)
     except:
         return ""
+    return text
 
-def extract_text_from_docx(file_path):
-    try:
-        doc = Document(file_path)
-        return "\n".join([p.text for p in doc.paragraphs])
-    except:
-        return ""
-
-def parse_resume(file_path):
-    """Extract technical skills from a resume file."""
-    text = ""
-    if file_path.lower().endswith(".pdf"):
-        text = extract_text_from_pdf(file_path)
-    elif file_path.lower().endswith(".docx"):
-        text = extract_text_from_docx(file_path)
-
-    if not text:
-        return []
-
-    doc = nlp(text.lower())
-    tokens = set([token.text for token in doc if token.is_alpha])
-
-    skills = []
-    for keyword in TECH_KEYWORDS:
-        if any(k in tokens for k in keyword.lower().split()):
-            skills.append(keyword)
-
-    return list(dict.fromkeys(skills))
+def parse_resume(path):
+    text = extract_text(path).lower()
+    if not text: return []
+    doc = nlp(text)
+    tokens = {t.text for t in doc if t.is_alpha}
+    return [k for k in TECH_KEYWORDS if any(w in tokens for w in k.lower().split())]

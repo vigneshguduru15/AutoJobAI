@@ -1,22 +1,4 @@
-# Ignore Python cache and virtual environment
+.env
+*.json
 __pycache__/
-.venv/
 *.pyc
-*.pyo
-
-# Ignore environment and secrets
-.streamlit/secrets.toml
-
-# Ignore credentials and service account files
-credentials.json
-autojobai-*.json
-
-# Ignore temporary uploaded files
-user_resumes/
-uploaded_resume.pdf
-
-# macOS and IDE files
-.DS_Store
-.vscode/
-.idea/
-
