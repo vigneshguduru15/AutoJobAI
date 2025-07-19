@@ -1,17 +1,21 @@
+import re
+
+def normalize_text(text):
+    """Lowercase and clean text for matching."""
+    return re.sub(r"[^a-z0-9\s]", "", text.lower())
+
 def match_jobs(jobs, skills):
-    """Score jobs by overlap with extracted skills."""
-    matched = []
+    """Rank jobs by number of matching skills."""
+    normalized_skills = [normalize_text(skill) for skill in skills]
+    ranked = []
+
     for job in jobs:
-        score = 0
-        desc = (job.get("description") or "").lower()
-        title = (job.get("title") or "").lower()
+        title = normalize_text(job.get("title", ""))
+        desc = normalize_text(job.get("description", ""))
+        company = normalize_text(job.get("company_name", ""))
 
-        for skill in skills:
-            if skill.lower() in desc or skill.lower() in title:
-                score += 1
+        score = sum(skill in title or skill in desc or skill in company for skill in normalized_skills)
+        ranked.append((score, job))
 
-        job["match_score"] = score
-        matched.append(job)
-
-    return sorted(matched, key=lambda x: x["match_score"], reverse=True)
-    return matched
+    ranked.sort(key=lambda x: x[0], reverse=True)
+    return [job for score, job in ranked]

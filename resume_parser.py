@@ -5,7 +5,6 @@ from docx import Document
 # Load SpaCy model
 nlp = spacy.load("en_core_web_sm")
 
-# Valid tech skills list
 TECH_KEYWORDS = [
     "python", "java", "c++", "sql", "mongodb", "aws", "linux",
     "docker", "machine learning", "deep learning", "tensorflow",
@@ -16,15 +15,15 @@ TECH_KEYWORDS = [
 ]
 
 def extract_text_from_pdf(file_path):
+    text = ""
     try:
-        text = ""
         with open(file_path, "rb") as f:
             reader = PdfReader(f)
             for page in reader.pages:
                 text += page.extract_text() or ""
-        return text
     except:
         return ""
+    return text
 
 def extract_text_from_docx(file_path):
     try:
@@ -34,7 +33,7 @@ def extract_text_from_docx(file_path):
         return ""
 
 def parse_resume(file_path):
-    """Extract only tech-related skills from resume."""
+    """Extract technical skills from the resume text."""
     text = ""
     if file_path.lower().endswith(".pdf"):
         text = extract_text_from_pdf(file_path)
@@ -52,4 +51,4 @@ def parse_resume(file_path):
         if any(k in tokens for k in keyword.lower().split()):
             skills.append(keyword)
 
-    return list(dict.fromkeys(skills))  # Deduplicated
+    return list(dict.fromkeys(skills))  # Deduplicate

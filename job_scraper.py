@@ -3,12 +3,13 @@ import requests
 import logging
 import random
 from dotenv import load_dotenv
+import streamlit as st
 
-# Load environment variables
+# Load API key from Streamlit secrets (fallback to .env)
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
 
-RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY")
+RAPIDAPI_KEY = st.secrets.get("rapidapi", {}).get("api_key", os.getenv("RAPIDAPI_KEY"))
 RAPIDAPI_HOST = os.getenv("RAPIDAPI_HOST", "jsearch.p.rapidapi.com")
 
 COUNTRY_MAP = {
@@ -20,12 +21,13 @@ COUNTRY_MAP = {
 }
 
 def get_jobs(query="Software Engineer", location="India"):
-    """Fetch job listings from RapidAPI (JSearch) with random page for freshness."""
-    country_code = COUNTRY_MAP.get(location, "us")
-    query = " ".join(query.split()[:5])  # Limit query length
-    url = f"https://{RAPIDAPI_HOST}/search"
+    """Fetch job listings from RapidAPI (JSearch) with random page for variety."""
+    if not RAPIDAPI_KEY:
+        logging.error("No RapidAPI key found. Set it in Streamlit Secrets or .env")
+        return []
 
-    # Pick a random page (1 to 3) to vary results each time
+    country_code = COUNTRY_MAP.get(location, "us")
+    url = f"https://{RAPIDAPI_HOST}/search"
     page_num = random.randint(1, 3)
 
     headers = {
@@ -41,7 +43,7 @@ def get_jobs(query="Software Engineer", location="India"):
     }
 
     try:
-        response = requests.get(url, headers=headers, params=params)
+        response = requests.get(url, headers=headers, params=params, timeout=15)
         if response.status_code != 200:
             logging.error(f"API Error {response.status_code}: {response.text}")
             return []
@@ -49,18 +51,15 @@ def get_jobs(query="Software Engineer", location="India"):
         data = response.json()
         jobs = data.get("data", [])
 
-        # Normalize job fields and guarantee a link
         for job in jobs:
-            title = job.get("job_title", "No Title")
-            company = job.get("employer_name", "Unknown")
-            job["title"] = title
-            job["company_name"] = company
+            job["title"] = job.get("job_title", "No Title")
+            job["company_name"] = job.get("employer_name", "Unknown")
             job["description"] = job.get("job_description", "No description available.")
             job["apply_link"] = (
                 job.get("job_apply_link")
                 or job.get("job_posting_url")
                 or job.get("job_link")
-                or f"https://www.google.com/search?q={title.replace(' ', '+')}+{company.replace(' ', '+')}+job"
+                or f"https://www.google.com/search?q={job.get('job_title','').replace(' ', '+')}+{job.get('employer_name','').replace(' ', '+')}+job"
             )
 
         logging.info(f"Fetched {len(jobs)} jobs (page {page_num}) for '{query}' in {location}")
