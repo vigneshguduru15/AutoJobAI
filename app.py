@@ -1,3 +1,4 @@
+# app.py - AutoJobAI (Final HTML-Only Version)
 import os
 import subprocess
 import tempfile
@@ -18,24 +19,20 @@ except ImportError:
 # --- Load environment variables ---
 load_dotenv()
 
-# --- Page Setup ---
+# --- Page Config ---
 st.set_page_config(page_title="AutoJobAI", layout="centered")
 st.title("🤖 AutoJobAI - Smart Job Matcher")
-st.write("Upload your resume (PDF or DOCX), see your skills, type your desired role, and get matched with jobs automatically!")
+st.write("Upload your resume (PDF or DOCX) to extract skills and get matched with jobs instantly!")
 
-# --- Initialize session state ---
-if "location" not in st.session_state:
-    st.session_state["location"] = "India"
-if "resume_uploaded" not in st.session_state:
-    st.session_state["resume_uploaded"] = False
+# --- Session State Initialization ---
 if "resume_path" not in st.session_state:
     st.session_state["resume_path"] = None
 if "skills" not in st.session_state:
     st.session_state["skills"] = []
-if "preferred_role" not in st.session_state:
-    st.session_state["preferred_role"] = "Software Engineer"
 if "jobs" not in st.session_state:
     st.session_state["jobs"] = []
+if "location" not in st.session_state:
+    st.session_state["location"] = "India"
 
 # --- Job location selector ---
 location = st.selectbox(
@@ -45,12 +42,17 @@ location = st.selectbox(
 )
 st.session_state["location"] = location
 
-# --- HTML5 uploader ---
+# --- HTML5 Uploader (Only) ---
 st.markdown(
     """
-    <label for="resume-upload" style="font-size: 18px; font-weight: bold;">📄 Upload Your Resume (PDF or DOCX)</label>
-    <input id="resume-upload" type="file" accept=".pdf,.docx" style="display:block;margin:15px 0;font-size:16px;">
-    <div id="upload-status" style="color:green;margin-bottom:10px;"></div>
+    <div style="margin-bottom:20px;">
+        <label for="resume-upload" style="font-size:20px;font-weight:bold;">
+            📄 Upload Your Resume (PDF or DOCX)
+        </label>
+        <input id="resume-upload" type="file" accept=".pdf,.docx"
+               style="display:block;margin-top:10px;font-size:16px;">
+        <div id="upload-status" style="color:green;margin-top:10px;"></div>
+    </div>
     <script>
         const fileInput = document.getElementById('resume-upload');
         const statusDiv = document.getElementById('upload-status');
@@ -59,9 +61,13 @@ st.markdown(
             if (!file) return;
             const reader = new FileReader();
             reader.onload = () => {
-                const data = reader.result;
-                window.parent.postMessage({type: 'resume-upload', name: file.name, data: data}, '*');
-                statusDiv.textContent = `Uploaded: ${file.name} (${(file.size/1024).toFixed(1)} KB)`;
+                const data = new Blob([reader.result]);
+                const formData = new FormData();
+                formData.append("file", file, file.name);
+                fetch("/upload", { method: "POST", body: formData }).then(() => {
+                    statusDiv.textContent = `Uploaded: ${file.name} (${(file.size/1024).toFixed(1)} KB)`;
+                    window.location.reload();  // Auto-refresh to process
+                });
             };
             reader.readAsArrayBuffer(file);
         });
@@ -70,35 +76,31 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# --- JavaScript-to-Python bridge ---
-uploaded_file = st.file_uploader("Hidden backup (used internally)", type=["pdf", "docx"], label_visibility="collapsed")
+# --- Backend: Save Uploaded Resume Automatically ---
+uploaded_file = st.file_uploader("HiddenUploader", type=["pdf", "docx"], label_visibility="collapsed")
 if uploaded_file:
     try:
         temp_dir = tempfile.gettempdir()
         file_path = os.path.join(temp_dir, uploaded_file.name)
         with open(file_path, "wb") as f:
             f.write(uploaded_file.read())
-
-        st.session_state["resume_uploaded"] = True
         st.session_state["resume_path"] = file_path
     except Exception as e:
         st.error(f"Error saving resume: {e}")
-        st.session_state["resume_uploaded"] = False
-        st.session_state["resume_path"] = None
 
-# --- Process resume & fetch jobs ---
-if st.session_state["resume_uploaded"] and st.session_state["resume_path"]:
+# --- If resume is uploaded, extract skills and fetch jobs automatically ---
+if st.session_state["resume_path"]:
     try:
         # Extract skills
-        st.session_state["skills"] = parse_resume(st.session_state["resume_path"])
-        skills = st.session_state["skills"]
+        skills = parse_resume(st.session_state["resume_path"])
+        st.session_state["skills"] = skills
 
         if skills:
-            st.write("🧠 **Extracted Skills:**", ", ".join(skills))
+            st.success(f"🧠 Extracted Skills: {', '.join(skills)}")
         else:
-            st.warning("No valid technical skills found. Searching for generic jobs.")
+            st.warning("No valid skills found. Searching generic jobs...")
 
-        # Suggest role
+        # Suggest default role
         default_role = "Software Engineer"
         if "machine learning" in skills or "tensorflow" in skills:
             default_role = "Machine Learning Engineer"
@@ -107,47 +109,37 @@ if st.session_state["resume_uploaded"] and st.session_state["resume_path"]:
         elif "aws" in skills or "mongodb" in skills:
             default_role = "Backend Developer"
 
-        st.session_state["preferred_role"] = st.text_input(
-            "💼 Type your preferred job role/title:",
-            value=default_role
-        )
+        # Let user type role (but auto-fetch jobs immediately)
+        preferred_role = st.text_input("💼 Enter your preferred job role/title:", value=default_role)
+        st.info(f"Fetching jobs for: **{preferred_role}** in {location}...")
 
-        # Fetch jobs automatically when role changes
-        if st.session_state["preferred_role"]:
-            query = st.session_state["preferred_role"]
-            st.info(f"Fetching jobs for: **{query}** in {location}")
-            st.session_state["jobs"] = get_jobs(query=query, location=location)
+        # Fetch jobs automatically
+        st.session_state["jobs"] = get_jobs(query=preferred_role, location=location)
 
-        # Display results
+        # Display jobs
         jobs = st.session_state["jobs"]
-        if jobs:
-            matched_jobs = match_jobs(jobs, skills)
+        matched_jobs = match_jobs(jobs, skills)
 
-            def display_job(job):
-                title = job.get("title", "No Title")
-                company = job.get("company_name", "Unknown")
-                desc = job.get("description", "No description available.")
-                link = job.get("apply_link") or "#"
+        def display_job(job):
+            title = job.get("title", "No Title")
+            company = job.get("company_name", "Unknown")
+            desc = job.get("description", "No description available.")
+            link = job.get("apply_link") or "#"
+            st.markdown(f"### {title}")
+            st.write(f"**Company:** {company}")
+            st.write(desc[:250] + "...")
+            if link and link != "#":
+                st.markdown(f"[**👉 Apply Here**]({link})", unsafe_allow_html=True)
+            st.write("---")
 
-                st.markdown(f"### {title}")
-                st.write(f"**Company:** {company}")
-                st.write(desc[:250] + "...")
-                if link and link != "#":
-                    st.markdown(f"[**👉 Apply Here**]({link})", unsafe_allow_html=True)
-                st.write("---")
-
-            st.subheader("Top Matching Jobs")
-            if matched_jobs:
-                for job in matched_jobs[:10]:
-                    display_job(job)
-            else:
-                st.info("No strong matches found. Showing all jobs.")
-                for job in jobs[:10]:
-                    display_job(job)
-
-            if st.button("🔁 Refresh Jobs"):
-                query = st.session_state["preferred_role"]
-                st.session_state["jobs"] = get_jobs(query=query, location=location)
+        st.subheader("Top Matching Jobs")
+        if matched_jobs:
+            for job in matched_jobs[:10]:
+                display_job(job)
+        else:
+            st.info("No strong matches found. Showing all jobs.")
+            for job in jobs[:10]:
+                display_job(job)
 
     except Exception as e:
         st.error(f"An error occurred: {e}")

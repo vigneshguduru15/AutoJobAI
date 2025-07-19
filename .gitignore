@@ -1,24 +1,22 @@
-# Environment and secrets
-.env
-*.json
-*.toml
-
-# Python cache & build
+# Ignore Python cache and virtual environment
 __pycache__/
+.venv/
 *.pyc
 *.pyo
-*.pyd
 
-# Virtual environment
-.venv/
-env/
+# Ignore environment and secrets
+.streamlit/secrets.toml
 
-# Uploads and local temp files
+# Ignore credentials and service account files
+credentials.json
+autojobai-*.json
+
+# Ignore temporary uploaded files
 user_resumes/
 uploaded_resume.pdf
-*.pdf
-*.docx
 
-# IDE and system files
-.vscode/
+# macOS and IDE files
 .DS_Store
+.vscode/
+.idea/
+
