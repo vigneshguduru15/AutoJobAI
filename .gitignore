@@ -1,7 +1,21 @@
-# Ignore environment files and local data
+# Environment variables
 .env
-*.pyc
+
+# Google Cloud credentials
+*.json
+
+# Python cache
 __pycache__/
+*.pyc
+
+# Virtual environment
+.venv/
+env/
+venv/
+
+# Streamlit secrets (kept in cloud, not in repo)
+.streamlit/
+
+# Local resumes (don’t upload user files to GitHub)
 user_resumes/
 uploaded_resume.pdf
-*.log
