@@ -1,1 +1,18 @@
+# Python virtual environment
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Environment variables
 .env
+
+# Google OAuth credentials (keep private)
+credentials.json
+
+# Local and temp files
+uploaded_resume.pdf
+user_resumes/
+resumes/
+runtime.txt
+test_*.py
