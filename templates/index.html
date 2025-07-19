@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>🤖 AutoJobAI - Smart Job Matcher</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; text-align: center; }
+        input, select, button { margin-top: 10px; padding: 10px; font-size: 16px; }
+        #results { margin-top: 30px; text-align: left; max-width: 700px; margin-left: auto; margin-right: auto; }
+        .job-card { border: 1px solid #ddd; border-radius: 8px; padding: 10px; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <h1>🤖 AutoJobAI - Smart Job Matcher</h1>
+    <p>Upload your resume (PDF or DOCX) to extract skills and find matching jobs instantly.</p>
+
+    <label for="resume">📄 Upload Resume:</label>
+    <input type="file" id="resume" accept=".pdf,.docx"><br>
+
+    <label for="location">🌐 Select Location:</label>
+    <select id="location">
+        <option>India</option>
+        <option>United States</option>
+        <option>United Kingdom</option>
+        <option>Canada</option>
+        <option>Remote</option>
+    </select><br>
+
+    <label for="role">💼 Preferred Role:</label>
+    <input type="text" id="role" value="Software Engineer"><br>
+
+    <button id="findJobsBtn" disabled>Find Jobs</button>
+
+    <div id="status"></div>
+    <div id="results"></div>
+
+    <script>
+        const resumeInput = document.getElementById("resume");
+        const findJobsBtn = document.getElementById("findJobsBtn");
+        const statusDiv = document.getElementById("status");
+        const resultsDiv = document.getElementById("results");
+        let extractedSkills = [];
+
+        resumeInput.addEventListener("change", async () => {
+            const file = resumeInput.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append("resume", file);
+            statusDiv.innerText = "Uploading and analyzing resume...";
+
+            const res = await fetch("/upload", { method: "POST", body: formData });
+            const data = await res.json();
+
+            if (data.error) {
+                statusDiv.innerText = "Upload failed: " + data.error;
+            } else {
+                extractedSkills = data.skills;
+                document.getElementById("role").value = data.default_role;
+                findJobsBtn.disabled = false;
+                statusDiv.innerText = "Skills extracted: " + extractedSkills.join(", ");
+            }
+        });
+
+        findJobsBtn.addEventListener("click", async () => {
+            const role = document.getElementById("role").value;
+            const location = document.getElementById("location").value;
+
+            statusDiv.innerText = "Fetching jobs for " + role + " in " + location + "...";
+
+            const res = await fetch("/find-jobs", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ role, location, skills: extractedSkills })
+            });
+            const data = await res.json();
+
+            if (data.error) {
+                statusDiv.innerText = "Error: " + data.error;
+            } else {
+                resultsDiv.innerHTML = "";
+                data.jobs.forEach(job => {
+                    const card = document.createElement("div");
+                    card.className = "job-card";
+                    card.innerHTML = `
+                        <h3>${job.title}</h3>
+                        <p><strong>Company:</strong> ${job.company_name}</p>
+                        <p>${job.description.slice(0,200)}...</p>
+                        <a href="${job.apply_link}" target="_blank">👉 Apply Here</a>
+                    `;
+                    resultsDiv.appendChild(card);
+                });
+                statusDiv.innerText = "Top jobs loaded.";
+            }
+        });
+    </script>
+</body>
+</html>
