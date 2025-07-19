@@ -129,3 +129,170 @@ if st.session_state["resume_uploaded"] and st.session_state["resume_path"]:
         st.error(f"An error occurred: {e}")
 else:
     st.warning("Please upload your resume to find matching jobs.")
+import os
+import tempfile
+import time
+import base64
+import streamlit as st
+from dotenv import load_dotenv
+from resume_parser import parse_resume
+from matcher import match_jobs
+from job_scraper import get_jobs
+
+# --- Load environment variables ---
+load_dotenv()
+
+st.set_page_config(page_title="AutoJobAI", layout="centered")
+
+st.title("🤖 AutoJobAI - Smart Job Matcher")
+st.write("Upload your resume (PDF or DOCX), see your skills, and get matched with jobs instantly!")
+
+# --- Initialize session state ---
+if "resume_uploaded" not in st.session_state:
+    st.session_state["resume_uploaded"] = False
+if "resume_path" not in st.session_state:
+    st.session_state["resume_path"] = None
+if "location" not in st.session_state:
+    st.session_state["location"] = "India"
+
+# --- Job Location Selector ---
+location = st.selectbox(
+    "🌐 Select Job Location:",
+    ["India", "United States", "United Kingdom", "Canada", "Remote"],
+    index=["India", "United States", "United Kingdom", "Canada", "Remote"].index(st.session_state["location"])
+)
+st.session_state["location"] = location
+
+# --- Custom HTML Uploader (works for mobile & desktop) ---
+def show_html_uploader():
+    upload_script = """
+    <style>
+    .file-drop-area {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        max-width: 500px;
+        padding: 40px;
+        border: 2px dashed #4CAF50;
+        border-radius: 12px;
+        background-color: #fafafa;
+        cursor: pointer;
+        text-align: center;
+        margin: 0 auto 20px;
+    }
+    .file-drop-area:hover {
+        background-color: #f1f1f1;
+    }
+    .file-drop-area input {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+        cursor: pointer;
+    }
+    .file-drop-text {
+        font-size: 18px;
+        color: #333;
+    }
+    </style>
+    <div class="file-drop-area">
+        <span class="file-drop-text">📄 <b>Upload Resume (PDF or DOCX)</b></span>
+        <input type="file" id="resumeUpload" accept=".pdf,.docx" />
+    </div>
+    <p id="uploadStatus" style="text-align:center; color:#4CAF50; font-weight:bold;"></p>
+    <script>
+    const input = document.getElementById("resumeUpload");
+    input.addEventListener("change", () => {
+        const file = input.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const data = reader.result.split(",")[1];
+                fetch("/upload", {
+                    method: "POST",
+                    body: JSON.stringify({filename: file.name, data}),
+                    headers: {"Content-Type": "application/json"}
+                }).then(() => {
+                    document.getElementById("uploadStatus").innerText = 
+                        `Uploaded: ${file.name}`;
+                });
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+    </script>
+    """
+    st.components.v1.html(upload_script, height=220)
+
+show_html_uploader()
+
+# --- Check if file was uploaded ---
+if st.session_state.get("resume_path"):
+    st.success(f"Resume uploaded: {os.path.basename(st.session_state['resume_path'])}")
+
+# --- Continue if resume available ---
+if st.session_state.get("resume_path"):
+    try:
+        # Extract skills
+        skills = parse_resume(st.session_state["resume_path"])
+        if skills:
+            st.write("🧠 **Extracted Skills:**", ", ".join(skills))
+        else:
+            st.warning("No specific skills detected. Searching generic jobs.")
+
+        # Suggest default job role based on skills
+        default_role = "Software Engineer"
+        if "machine learning" in skills or "tensorflow" in skills:
+            default_role = "Machine Learning Engineer"
+        elif "react" in skills or "node.js" in skills:
+            default_role = "Full Stack Developer"
+        elif "aws" in skills or "mongodb" in skills:
+            default_role = "Backend Developer"
+
+        preferred_role = st.text_input("💼 Enter your preferred job role/title:", value=default_role)
+
+        # Session for job results
+        if "jobs" not in st.session_state:
+            st.session_state["jobs"] = []
+
+        # Fetch jobs
+        if st.button("Find Jobs"):
+            st.info(f"Searching jobs for: **{preferred_role}** in {location}")
+            st.session_state["jobs"] = get_jobs(query=preferred_role, location=location)
+
+        jobs = st.session_state["jobs"]
+
+        # Display job listings
+        if jobs:
+            matched_jobs = match_jobs(jobs, skills)
+
+            def display_job(job):
+                title = job.get("title", "No Title")
+                company = job.get("company_name", "Unknown")
+                desc = job.get("description", "No description available.")
+                link = job.get("apply_link") or "#"
+                st.markdown(f"### {title}")
+                st.write(f"**Company:** {company}")
+                st.write(desc[:250] + "...")
+                if link and link != "#":
+                    st.markdown(f"[**👉 Apply Here**]({link})", unsafe_allow_html=True)
+                st.write("---")
+
+            st.subheader("Top Matching Jobs")
+            if matched_jobs:
+                for job in matched_jobs[:10]:
+                    display_job(job)
+            else:
+                st.info("No strong matches found. Showing all jobs.")
+                for job in jobs[:10]:
+                    display_job(job)
+
+            if st.button("🔁 Refresh Jobs"):
+                st.session_state["jobs"] = get_jobs(query=preferred_role, location=location)
+
+    except Exception as e:
+        st.error(f"An error occurred: {e}")
+else:
+    st.info("Upload your resume using the uploader above to get started.")
