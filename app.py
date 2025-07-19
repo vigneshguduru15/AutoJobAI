@@ -2,6 +2,7 @@ import os
 import io
 import tempfile
 import subprocess
+import json
 import streamlit as st
 from dotenv import load_dotenv
 from google.oauth2 import service_account
@@ -20,36 +21,40 @@ except ImportError:
 # --- Load environment variables ---
 load_dotenv()
 
-# Google Drive setup
-CREDENTIALS_FILE = os.getenv("GOOGLE_CREDENTIALS", "credentials.json")
-DRIVE_FOLDER_NAME = os.getenv("DRIVE_UPLOAD_FOLDER", "AutoJobAI_Uploads")
-
-# Authenticate Google API
-creds = service_account.Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=["https://www.googleapis.com/auth/drive"])
+# --- Load Google credentials from Streamlit Secrets ---
+service_account_info = json.loads(st.secrets["google"]["credentials"])
+creds = service_account.Credentials.from_service_account_info(
+    service_account_info,
+    scopes=["https://www.googleapis.com/auth/drive"]
+)
 drive_service = build("drive", "v3", credentials=creds)
 
-# Ensure Drive folder exists
+# --- Ensure Google Drive folder exists ---
+DRIVE_FOLDER_NAME = os.getenv("DRIVE_UPLOAD_FOLDER", "AutoJobAI_Uploads")
 def get_or_create_folder(folder_name):
-    results = drive_service.files().list(q=f"name='{folder_name}' and mimeType='application/vnd.google-apps.folder' and trashed=false", fields="files(id)").execute()
+    results = drive_service.files().list(
+        q=f"name='{folder_name}' and mimeType='application/vnd.google-apps.folder' and trashed=false",
+        fields="files(id)"
+    ).execute()
     items = results.get("files", [])
     if items:
         return items[0]["id"]
-    # Create folder if not exists
+    # Create folder if it doesn't exist
     file_metadata = {"name": folder_name, "mimeType": "application/vnd.google-apps.folder"}
     folder = drive_service.files().create(body=file_metadata, fields="id").execute()
     return folder.get("id")
 
 FOLDER_ID = get_or_create_folder(DRIVE_FOLDER_NAME)
 
-# Upload file to Google Drive
+# --- Google Drive Upload/Download Functions ---
 def upload_to_drive(file):
     file_name = file.name
+    mime_type = "application/pdf" if file_name.endswith(".pdf") else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     file_metadata = {"name": file_name, "parents": [FOLDER_ID]}
-    media = MediaIoBaseUpload(file, mimetype="application/pdf" if file_name.endswith(".pdf") else "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+    media = MediaIoBaseUpload(file, mimetype=mime_type)
     uploaded_file = drive_service.files().create(body=file_metadata, media_body=media, fields="id").execute()
     return uploaded_file.get("id")
 
-# Download file back from Drive
 def download_from_drive(file_id):
     request = drive_service.files().get_media(fileId=file_id)
     fh = io.BytesIO()
@@ -58,20 +63,19 @@ def download_from_drive(file_id):
     while done is False:
         status, done = downloader.next_chunk()
     fh.seek(0)
-    # Save to a temp file for parsing
     temp_dir = tempfile.gettempdir()
     local_path = os.path.join(temp_dir, f"resume_{file_id}.pdf")
     with open(local_path, "wb") as f:
         f.write(fh.read())
     return local_path
 
-# --- Streamlit UI ---
+# --- Streamlit App ---
 st.set_page_config(page_title="AutoJobAI", layout="centered")
 
 st.title("🤖 AutoJobAI - Smart Job Matcher")
 st.write("Upload your resume (PDF or DOCX), and let AI match you with top job listings (mobile & desktop friendly)!")
 
-# Session state initialization
+# Initialize session state
 if "location" not in st.session_state:
     st.session_state["location"] = "India"
 if "resume_uploaded" not in st.session_state:
@@ -79,7 +83,7 @@ if "resume_uploaded" not in st.session_state:
 if "resume_path" not in st.session_state:
     st.session_state["resume_path"] = None
 
-# Location selector
+# Job location selector
 location = st.selectbox(
     "🌐 Select Job Location:",
     ["India", "United States", "United Kingdom", "Canada", "Remote"],
@@ -91,7 +95,6 @@ st.session_state["location"] = location
 uploaded_file = st.file_uploader("📄 Upload your resume (PDF or DOCX)", type=["pdf", "docx"])
 if uploaded_file:
     try:
-        # Upload to Drive and download back
         st.info("Uploading your resume to Google Drive... please wait")
         file_id = upload_to_drive(uploaded_file)
         resume_path = download_from_drive(file_id)
@@ -103,7 +106,7 @@ if uploaded_file:
         st.session_state["resume_uploaded"] = False
         st.session_state["resume_path"] = None
 
-# Continue only if resume uploaded
+# Continue if resume uploaded
 if st.session_state["resume_uploaded"] and st.session_state["resume_path"]:
     try:
         skills = parse_resume(st.session_state["resume_path"])
@@ -112,7 +115,7 @@ if st.session_state["resume_uploaded"] and st.session_state["resume_path"]:
         else:
             st.warning("No valid technical skills found. Will search generic jobs.")
 
-        # Suggest default role
+        # Suggest default job role
         default_role = "Software Engineer"
         if "machine learning" in skills or "tensorflow" in skills:
             default_role = "Machine Learning Engineer"
