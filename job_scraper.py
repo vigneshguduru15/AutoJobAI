@@ -19,37 +19,34 @@ COUNTRY_MAP = {
 
 def get_jobs(query="Software Engineer", location="India"):
     if not RAPIDAPI_KEY:
-        logging.error("No RAPIDAPI_KEY set in .env")
+        logging.error("No RAPIDAPI_KEY found. Add it to your .env")
         return []
 
+    country_code = COUNTRY_MAP.get(location, "us")
     url = f"https://{RAPIDAPI_HOST}/search"
-    params = {
-        "query": f"{query} in {location}",
-        "num_pages": 1,
-        "page": 1,
-        "country": COUNTRY_MAP.get(location, "us")
-    }
     headers = {
         "X-RapidAPI-Key": RAPIDAPI_KEY,
         "X-RapidAPI-Host": RAPIDAPI_HOST
     }
+    params = {
+        "query": f"{query} in {location}",
+        "page": 1,
+        "num_pages": 1,
+        "country": country_code
+    }
 
     try:
-        res = requests.get(url, headers=headers, params=params)
-        if res.status_code != 200:
-            logging.error(f"API Error {res.status_code}: {res.text}")
+        resp = requests.get(url, headers=headers, params=params)
+        if resp.status_code != 200:
+            logging.error(f"API Error {resp.status_code}: {resp.text}")
             return []
-
-        data = res.json()
-        jobs = data.get("data", [])
-
-        for job in jobs:
+        data = resp.json().get("data", [])
+        for job in data:
             job["title"] = job.get("job_title", "No Title")
             job["company_name"] = job.get("employer_name", "Unknown")
-            job["description"] = job.get("job_description", "No description")
+            job["description"] = job.get("job_description", "No description.")
             job["apply_link"] = job.get("job_apply_link") or job.get("job_posting_url") or "#"
-
-        return jobs
+        return data
     except Exception as e:
         logging.error(f"Job fetch failed: {e}")
         return []

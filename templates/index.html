@@ -1,97 +1,97 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="utf-8">
-    <title>🤖 AutoJobAI - Smart Job Matcher</title>
+    <meta charset="UTF-8">
+    <title>AutoJobAI - Smart Job Matcher</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; text-align: center; }
-        input, select, button { margin-top: 10px; padding: 10px; font-size: 16px; }
-        #results { margin-top: 30px; text-align: left; max-width: 700px; margin-left: auto; margin-right: auto; }
-        .job-card { border: 1px solid #ddd; border-radius: 8px; padding: 10px; margin-bottom: 10px; }
+        body { font-family: Arial, sans-serif; background: #121212; color: #f1f1f1; text-align: center; margin: 0; padding: 20px; }
+        input, select, button { margin: 10px; padding: 10px; font-size: 16px; border-radius: 6px; border: none; }
+        .job-card { background: #1f1f1f; margin: 15px auto; padding: 15px; max-width: 600px; border-radius: 8px; text-align: left; }
+        button { background: #6200ee; color: white; cursor: pointer; }
+        button:hover { background: #3700b3; }
     </style>
 </head>
 <body>
     <h1>🤖 AutoJobAI - Smart Job Matcher</h1>
-    <p>Upload your resume (PDF or DOCX) to extract skills and find matching jobs instantly.</p>
+    <p>Upload your resume to extract skills and get matched with jobs!</p>
 
-    <label for="resume">📄 Upload Resume:</label>
-    <input type="file" id="resume" accept=".pdf,.docx"><br>
-
-    <label for="location">🌐 Select Location:</label>
+    <!-- Upload Section -->
+    <input type="file" id="resume" accept=".pdf,.docx">
     <select id="location">
         <option>India</option>
         <option>United States</option>
         <option>United Kingdom</option>
         <option>Canada</option>
         <option>Remote</option>
-    </select><br>
+    </select>
+    <br>
+    <p id="status"></p>
+    <div id="skills"></div>
 
-    <label for="role">💼 Preferred Role:</label>
-    <input type="text" id="role" value="Software Engineer"><br>
+    <!-- Job Role & Button -->
+    <input type="text" id="role" placeholder="Preferred Job Role" style="width:250px;">
+    <button id="find-jobs">Find Jobs</button>
 
-    <button id="findJobsBtn" disabled>Find Jobs</button>
-
-    <div id="status"></div>
-    <div id="results"></div>
+    <!-- Job Results -->
+    <div id="job-results"></div>
 
     <script>
-        const resumeInput = document.getElementById("resume");
-        const findJobsBtn = document.getElementById("findJobsBtn");
-        const statusDiv = document.getElementById("status");
-        const resultsDiv = document.getElementById("results");
         let extractedSkills = [];
 
-        resumeInput.addEventListener("change", async () => {
-            const file = resumeInput.files[0];
+        document.getElementById("resume").addEventListener("change", async function() {
+            const file = this.files[0];
             if (!file) return;
+            document.getElementById("status").innerText = "Uploading and analyzing resume...";
 
             const formData = new FormData();
             formData.append("resume", file);
-            statusDiv.innerText = "Uploading and analyzing resume...";
 
             const res = await fetch("/upload", { method: "POST", body: formData });
             const data = await res.json();
 
             if (data.error) {
-                statusDiv.innerText = "Upload failed: " + data.error;
-            } else {
-                extractedSkills = data.skills;
-                document.getElementById("role").value = data.default_role;
-                findJobsBtn.disabled = false;
-                statusDiv.innerText = "Skills extracted: " + extractedSkills.join(", ");
+                document.getElementById("status").innerText = "Error: " + data.error;
+                return;
             }
+
+            extractedSkills = data.skills;
+            document.getElementById("skills").innerText = "Extracted Skills: " + (data.skills.join(", ") || "None");
+            document.getElementById("role").value = data.suggested_role;
+            document.getElementById("status").innerText = "Resume processed!";
         });
 
-        findJobsBtn.addEventListener("click", async () => {
+        document.getElementById("find-jobs").addEventListener("click", async function() {
             const role = document.getElementById("role").value;
             const location = document.getElementById("location").value;
 
-            statusDiv.innerText = "Fetching jobs for " + role + " in " + location + "...";
+            document.getElementById("status").innerText = `Finding jobs for ${role} in ${location}...`;
 
-            const res = await fetch("/find-jobs", {
+            const res = await fetch("/find_jobs", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ role, location, skills: extractedSkills })
             });
             const data = await res.json();
 
-            if (data.error) {
-                statusDiv.innerText = "Error: " + data.error;
-            } else {
-                resultsDiv.innerHTML = "";
-                data.jobs.forEach(job => {
-                    const card = document.createElement("div");
-                    card.className = "job-card";
-                    card.innerHTML = `
-                        <h3>${job.title}</h3>
-                        <p><strong>Company:</strong> ${job.company_name}</p>
-                        <p>${job.description.slice(0,200)}...</p>
-                        <a href="${job.apply_link}" target="_blank">👉 Apply Here</a>
-                    `;
-                    resultsDiv.appendChild(card);
-                });
-                statusDiv.innerText = "Top jobs loaded.";
+            const jobDiv = document.getElementById("job-results");
+            jobDiv.innerHTML = "";
+            if (!data.jobs || !data.jobs.length) {
+                jobDiv.innerHTML = "<p>No jobs found.</p>";
+                return;
             }
+
+            data.jobs.forEach(job => {
+                const div = document.createElement("div");
+                div.className = "job-card";
+                div.innerHTML = `
+                    <h3>${job.title}</h3>
+                    <p><strong>${job.company_name || "Unknown"}</strong></p>
+                    <p>${job.description.slice(0, 200)}...</p>
+                    <a href="${job.apply_link}" target="_blank" style="color:#03dac5;">Apply Here</a>
+                `;
+                jobDiv.appendChild(div);
+            });
+            document.getElementById("status").innerText = "Jobs loaded!";
         });
     </script>
 </body>

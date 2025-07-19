@@ -1,15 +1,10 @@
 def match_jobs(jobs, skills):
-    """Rank jobs based on skill matches."""
-    ranked = []
-    skill_set = set(skill.lower() for skill in skills)
-
+    matched = []
     for job in jobs:
-        text = (
-            (job.get("title", "") or "") + " " +
-            (job.get("description", "") or "")
-        ).lower()
-        score = sum(1 for skill in skill_set if skill in text)
-        ranked.append((score, job))
-
-    ranked.sort(key=lambda x: x[0], reverse=True)
-    return [job for score, job in ranked]
+        title = job.get("title", "").lower()
+        desc = job.get("description", "").lower()
+        score = sum(skill.lower() in title or skill.lower() in desc for skill in skills)
+        job["match_score"] = score
+        matched.append(job)
+    matched.sort(key=lambda x: x.get("match_score", 0), reverse=True)
+    return matched
