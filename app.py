@@ -1,15 +1,13 @@
 import os
 import subprocess
 import tempfile
-import time
+import json
+import requests
 import streamlit as st
 from dotenv import load_dotenv
 from resume_parser import parse_resume
 from matcher import match_jobs
 from job_scraper import get_jobs
-
-# --- Streamlit config must be first ---
-st.set_page_config(page_title="AutoJobAI", layout="centered")
 
 # --- Ensure SpaCy model is available ---
 try:
@@ -20,6 +18,8 @@ except ImportError:
 # --- Load environment variables ---
 load_dotenv()
 
+# --- Page Setup ---
+st.set_page_config(page_title="AutoJobAI", layout="centered")
 st.title("🤖 AutoJobAI - Smart Job Matcher")
 st.write("Upload your resume (PDF or DOCX), see your skills, and get matched with jobs instantly!")
 
@@ -39,33 +39,29 @@ location = st.selectbox(
 )
 st.session_state["location"] = location
 
-# --- Custom HTML uploader (mobile-friendly, single uploader) ---
+# --- HTML5-based uploader (works on mobile & desktop) ---
 st.markdown(
     """
-    <style>
-    .upload-button {
-        background-color: #4CAF50;
-        color: white;
-        padding: 15px 32px;
-        font-size: 18px;
-        border-radius: 8px;
-        cursor: pointer;
-        display: inline-block;
-        margin-top: 10px;
-    }
-    .upload-button:hover {
-        background-color: #45a049;
-    }
-    </style>
+    <label for="resume-upload" style="font-size: 18px; font-weight: bold;">📄 Upload Your Resume (PDF or DOCX)</label>
+    <input id="resume-upload" type="file" accept=".pdf,.docx" style="display: block; margin-top: 10px; margin-bottom: 20px; font-size: 16px;">
+    <div id="upload-status" style="color: green; margin-bottom: 10px;"></div>
+    <script>
+        const fileInput = document.getElementById('resume-upload');
+        const statusDiv = document.getElementById('upload-status');
+        fileInput.addEventListener('change', () => {
+            const file = fileInput.files[0];
+            if (!file) return;
+            statusDiv.textContent = `Selected file: ${file.name} (${(file.size/1024).toFixed(1)} KB)`;
+        });
+    </script>
     """,
     unsafe_allow_html=True
 )
 
-uploaded_file = st.file_uploader("📄 Upload Your Resume (PDF or DOCX)", type=["pdf", "docx"])
-
+# --- Save uploaded resume via Streamlit's file uploader bridge ---
+uploaded_file = st.file_uploader("Or select file here (HTML handler active)", type=["pdf", "docx"])
 if uploaded_file:
     try:
-        # Save to a temp file (safe for mobile/Streamlit Cloud)
         temp_dir = tempfile.gettempdir()
         file_path = os.path.join(temp_dir, uploaded_file.name)
         with open(file_path, "wb") as f:
@@ -74,23 +70,21 @@ if uploaded_file:
         st.session_state["resume_uploaded"] = True
         st.session_state["resume_path"] = file_path
         st.success(f"Resume '{uploaded_file.name}' uploaded successfully!")
-
     except Exception as e:
-        st.error(f"Upload failed: {e}")
+        st.error(f"Error saving uploaded resume: {e}")
         st.session_state["resume_uploaded"] = False
         st.session_state["resume_path"] = None
 
-# --- Continue only if resume uploaded ---
+# --- Main resume + job logic ---
 if st.session_state["resume_uploaded"] and st.session_state["resume_path"]:
     try:
-        # Extract skills
         skills = parse_resume(st.session_state["resume_path"])
         if skills:
             st.write("🧠 **Extracted Skills:**", ", ".join(skills))
         else:
-            st.warning("No technical skills found. Searching generic jobs.")
+            st.warning("No valid technical skills found. Will search for generic jobs.")
 
-        # Suggest default job role
+        # Suggest default job role based on skills
         default_role = "Software Engineer"
         if "machine learning" in skills or "tensorflow" in skills:
             default_role = "Machine Learning Engineer"
@@ -101,18 +95,16 @@ if st.session_state["resume_uploaded"] and st.session_state["resume_path"]:
 
         preferred_role = st.text_input("💼 Enter your preferred job role/title:", value=default_role)
 
-        # Session for job results
         if "jobs" not in st.session_state:
             st.session_state["jobs"] = []
 
-        # Fetch jobs
         if st.button("Find Jobs"):
             st.info(f"Searching jobs for: **{preferred_role}** in {location}")
-            st.session_state["jobs"] = get_jobs(query=preferred_role, location=location)
+            st.session_state["jobs"] = get_jobs(query=preferred_role or "Software Engineer", location=location)
 
         jobs = st.session_state["jobs"]
 
-        # Display job listings
+        # Display job results
         if jobs:
             matched_jobs = match_jobs(jobs, skills)
 
@@ -140,9 +132,9 @@ if st.session_state["resume_uploaded"] and st.session_state["resume_path"]:
 
             if st.button("🔁 Refresh Jobs"):
                 st.info(f"Fetching more jobs for: **{preferred_role}** in {location}")
-                st.session_state["jobs"] = get_jobs(query=preferred_role, location=location)
+                st.session_state["jobs"] = get_jobs(query=preferred_role or "Software Engineer", location=location)
 
     except Exception as e:
         st.error(f"An error occurred: {e}")
 else:
-    st.warning("Please upload your resume to start finding jobs.")
+    st.warning("Upload your resume using the uploader above to get started.")
