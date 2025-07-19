@@ -1,21 +1,24 @@
-# Environment variables
+# Environment and secrets
 .env
-
-# Google Cloud credentials
 *.json
+*.toml
 
-# Python cache
+# Python cache & build
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 
 # Virtual environment
 .venv/
 env/
-venv/
 
-# Streamlit secrets (kept in cloud, not in repo)
-.streamlit/
-
-# Local resumes (don’t upload user files to GitHub)
+# Uploads and local temp files
 user_resumes/
 uploaded_resume.pdf
+*.pdf
+*.docx
+
+# IDE and system files
+.vscode/
+.DS_Store

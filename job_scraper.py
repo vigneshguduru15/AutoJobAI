@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
 
-# Get API credentials from Streamlit Secrets (preferred) or .env
+# Get API key from Streamlit Secrets (preferred) or .env
 try:
     from streamlit import secrets
     RAPIDAPI_KEY = secrets["rapidapi"]["api_key"]
@@ -18,6 +18,7 @@ except Exception:
 
 RAPIDAPI_HOST = "jsearch.p.rapidapi.com"
 
+# Country codes mapping for API queries
 COUNTRY_MAP = {
     "India": "in",
     "United States": "us",
@@ -27,16 +28,19 @@ COUNTRY_MAP = {
 }
 
 def get_jobs(query="Software Engineer", location="India"):
-    """Fetch job listings from RapidAPI (JSearch) with random page for varied results."""
+    """
+    Fetch job listings from RapidAPI JSearch with random page number for variety.
+    Returns a list of job dicts with title, company, description, and apply_link.
+    """
     if not RAPIDAPI_KEY:
-        logging.error("No RAPIDAPI_KEY found. Please set it in Streamlit Secrets or .env")
+        logging.error("No RAPIDAPI_KEY found. Set it in Streamlit Secrets or .env")
         return []
 
     country_code = COUNTRY_MAP.get(location, "us")
     query = " ".join(query.split()[:5])  # Limit query length
     url = f"https://{RAPIDAPI_HOST}/search"
 
-    # Pick a random page (1 to 3) so results vary each refresh
+    # Randomize page to get fresh results
     page_num = random.randint(1, 3)
 
     headers = {
@@ -60,6 +64,7 @@ def get_jobs(query="Software Engineer", location="India"):
         data = response.json()
         jobs = data.get("data", [])
 
+        # Normalize job data and ensure clickable apply links
         for job in jobs:
             title = job.get("job_title", "No Title")
             company = job.get("employer_name", "Unknown")

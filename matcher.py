@@ -1,19 +1,22 @@
 # matcher.py
 def match_jobs(jobs, skills):
     """
-    Match jobs based on overlap with extracted skills.
-    Returns jobs sorted by relevance (highest matches first).
+    Score jobs based on overlap with extracted resume skills.
+    Higher matching skill count = higher ranking.
     """
-    if not jobs or not skills:
-        return jobs  # Return as-is if no skills to match
+    if not jobs:
+        return []
 
-    skill_set = set(skill.lower() for skill in skills)
+    skills = [s.lower() for s in skills]
+    scored_jobs = []
 
-    # Add a "match_score" to each job based on skill overlap
     for job in jobs:
-        text = f"{job.get('title', '')} {job.get('description', '')}".lower()
-        job["match_score"] = sum(1 for skill in skill_set if skill in text)
+        desc = job.get("description", "").lower()
+        title = job.get("title", "").lower()
+        score = sum(1 for s in skills if s in desc or s in title)
+        scored_jobs.append((score, job))
 
-    # Sort by match_score (descending)
-    matched = sorted(jobs, key=lambda x: x.get("match_score", 0), reverse=True)
-    return matched
+    # Sort by score (highest first)
+    scored_jobs.sort(key=lambda x: x[0], reverse=True)
+
+    return [job for score, job in scored_jobs]
