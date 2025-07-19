@@ -1,4 +1,11 @@
+# Ignore Python cache and environment
+__pycache__/
+.venv/
+
+# Ignore local credentials and secrets
 .env
 *.json
-__pycache__/
-*.pyc
+
+# Ignore user-uploaded files
+user_resumes/
+uploaded_resume.pdf
